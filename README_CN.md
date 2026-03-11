@@ -135,7 +135,7 @@ Skills 就是普通的 Markdown 文件，fork 后随意改：
 
 ## 📋 Roadmap
 
-- [ ] **GLM-5（执行者）+ Minimax-2.1（评审者）** — 与 Claude Code + Codex 平行的跨模型组合
+- [ ] **GLM-5（执行者）+ Minimax-2.5（评审者）** — 与 Claude Code + Codex 平行的跨模型组合
 - [ ] 更多执行者 × 评审者组合（Gemini、DeepSeek 等）
 
 ## 💬 交流群

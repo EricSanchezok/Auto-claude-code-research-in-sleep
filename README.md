@@ -201,7 +201,7 @@ Skills are plain Markdown files. Fork and customize:
 
 ## 📋 Roadmap
 
-- [ ] **GLM-5 (executor) + Minimax-2.1 (reviewer)** — alternative cross-model pair, same architecture as Claude Code + Codex
+- [ ] **GLM-5 (executor) + Minimax-2.5 (reviewer)** — alternative cross-model pair, same architecture as Claude Code + Codex
 - [ ] More executor × reviewer combinations (Gemini, DeepSeek, etc.)
 
 ## 💬 Community
