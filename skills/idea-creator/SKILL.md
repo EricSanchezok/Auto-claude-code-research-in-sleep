@@ -112,9 +112,35 @@ For each surviving idea, run a deeper evaluation:
    - Which 2-3 would you actually work on?
    ```
 
-3. **Combine rankings**: Merge your assessment with GPT-5.4's ranking.
+3. **Combine rankings**: Merge your assessment with GPT-5.4's ranking. Select top 2-3 ideas for pilot experiments.
 
-### Phase 5: Output — Ranked Idea Report
+### Phase 5: Parallel Pilot Experiments (for top 2-3 ideas)
+
+Before committing to a full research effort, run cheap pilot experiments to get empirical signal. This is the key differentiator from paper-only validation.
+
+1. **Design pilots**: For each top idea, define the minimal experiment that would give a positive or negative signal:
+   - Single seed, small scale (e.g., small dataset subset, fewer epochs)
+   - Target: 30 min - 2 hours per pilot on 1 GPU
+   - Clear success metric defined upfront (e.g., "if metric improves by > 1%, signal is positive")
+
+2. **Deploy in parallel**: Use `/run-experiment` to launch pilots on different GPUs simultaneously:
+   ```
+   GPU 0: Pilot for Idea 1
+   GPU 1: Pilot for Idea 2
+   GPU 2: Pilot for Idea 3
+   ```
+   Use `run_in_background: true` to launch all at once.
+
+3. **Collect results**: Use `/monitor-experiment` to check progress. Once all pilots complete, compare:
+   - Which ideas showed positive signal?
+   - Which showed null/negative results? (eliminate or deprioritize)
+   - Any surprising findings that suggest a pivot?
+
+4. **Re-rank based on empirical evidence**: Update the idea ranking using pilot results. An idea with strong pilot signal jumps ahead of a theoretically appealing but untested idea.
+
+Note: Skip this phase if the ideas are purely theoretical or if no GPU is available. Flag skipped ideas as "needs pilot validation" in the report.
+
+### Phase 6: Output — Ranked Idea Report
 
 Write a structured report to `IDEA_REPORT.md` in the project root:
 
@@ -123,7 +149,7 @@ Write a structured report to `IDEA_REPORT.md` in the project root:
 
 **Direction**: [user's research direction]
 **Generated**: [date]
-**Ideas evaluated**: X generated → Y survived filtering → Z recommended
+**Ideas evaluated**: X generated → Y survived filtering → Z piloted → W recommended
 
 ## Landscape Summary
 [3-5 paragraphs on the current state of the field]
@@ -138,6 +164,7 @@ Write a structured report to `IDEA_REPORT.md` in the project root:
 - **Feasibility**: [compute, data, implementation estimates]
 - **Risk**: LOW/MEDIUM/HIGH
 - **Contribution type**: empirical / method / theory / diagnostic
+- **Pilot result**: [POSITIVE: metric +X% / NEGATIVE: no signal / SKIPPED: needs GPU]
 - **Reviewer's likely objection**: [strongest counterargument]
 - **Why we should do this**: [1-2 sentences]
 
@@ -151,15 +178,21 @@ Write a structured report to `IDEA_REPORT.md` in the project root:
 | ... | Requires > 1 week GPU time |
 | ... | Result wouldn't be interesting either way |
 
+## Pilot Experiment Results
+| Idea | GPU | Time | Key Metric | Signal |
+|------|-----|------|------------|--------|
+| Idea 1 | GPU 0 | 45 min | +2.3% CE | POSITIVE |
+| Idea 2 | GPU 1 | 30 min | -0.1% CE | NEGATIVE |
+| Idea 3 | GPU 2 | 1.5 hr | +0.8% CE | WEAK POSITIVE |
+
 ## Suggested Execution Order
-1. Start with Idea X (lowest risk, fastest to validate)
-2. If X works, extend to Idea Y
-3. Idea Z is high-risk high-reward — run in parallel if GPUs available
+1. Start with Idea 1 (positive pilot signal, lowest risk)
+2. Idea 3 as backup (weak signal, may need larger scale to confirm)
+3. Idea 2 eliminated by pilot — negative result documented
 
 ## Next Steps
-- [ ] Implement Idea 1 baseline
-- [ ] Run pilot experiment
-- [ ] If promising, invoke /auto-review-loop for full iteration
+- [ ] Scale up Idea 1 to full experiment (multi-seed, full dataset)
+- [ ] If confirmed, invoke /auto-review-loop for full iteration
 ```
 
 ## Key Rules
