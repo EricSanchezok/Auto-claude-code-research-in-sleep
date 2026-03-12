@@ -48,13 +48,14 @@ After `IDEA_REPORT.md` is generated, **pause and present the top ideas to the us
 Recommended: Idea 1. Shall I proceed with implementation?
 ```
 
-**Wait for user confirmation before continuing.** The user may want to:
-- Pick a different idea
-- Modify the approach
-- Add constraints
-- Stop here and think
+**Wait for user confirmation before continuing.** The user may:
+- **Approve an idea** → proceed to Stage 2.
+- **Pick a different idea** → proceed with their choice.
+- **Request changes** (e.g., "combine Idea 1 and 3", "focus more on X") → update the idea prompt with user feedback, re-run `/idea-discovery` with refined constraints, and present again.
+- **Reject all ideas** → collect feedback on what's missing, re-run Stage 1 with adjusted research direction. Repeat until the user commits to an idea.
+- **Stop here** → save current state to `IDEA_REPORT.md` for future reference.
 
-> ⚠️ **This is the most important checkpoint.** The rest of the pipeline is expensive (GPU time + multiple review rounds). Make sure the user is committed to the chosen direction.
+> ⚠️ **This is the most important checkpoint.** The rest of the pipeline is expensive (GPU time + multiple review rounds). Do NOT proceed until the user explicitly confirms which idea to pursue.
 
 ### Stage 2: Implementation
 

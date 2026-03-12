@@ -45,7 +45,17 @@ Invoke `/research-lit` to map the research landscape:
 - Identify structural gaps and recurring limitations
 - Output a literature summary (saved to working notes)
 
-**Checkpoint:** Review the landscape summary. If the direction is too broad or too narrow, adjust before continuing.
+**🚦 Checkpoint:** Present the landscape summary to the user. Ask:
+
+```
+📚 Literature survey complete. Here's what I found:
+- [key findings, gaps, open problems]
+
+Does this match your understanding? Should I adjust the scope before generating ideas?
+```
+
+- **User approves** → proceed to Phase 2.
+- **User requests changes** (e.g., "focus more on X", "ignore Y", "too broad") → refine the search with updated queries, re-run `/research-lit` with adjusted scope, and present again. Repeat until the user is satisfied.
 
 ### Phase 2: Idea Generation + Filtering + Pilots
 
@@ -63,7 +73,21 @@ Invoke `/idea-creator` with the landscape context:
 - Rank by empirical signal
 - Output `IDEA_REPORT.md`
 
-**Checkpoint:** Review `IDEA_REPORT.md`. Confirm at least 1-2 ideas have positive pilot signal.
+**🚦 Checkpoint:** Present `IDEA_REPORT.md` ranked ideas to the user. Ask:
+
+```
+💡 Generated X ideas, filtered to Y, piloted Z. Top results:
+
+1. [Idea 1] — Pilot: POSITIVE (+X%)
+2. [Idea 2] — Pilot: WEAK POSITIVE (+Y%)
+3. [Idea 3] — Pilot: NEGATIVE, eliminated
+
+Which ideas should I validate further? Or should I regenerate with different constraints?
+```
+
+- **User picks ideas** → proceed to Phase 3 with selected ideas.
+- **User unhappy with all ideas** → collect feedback ("what's missing?", "what direction do you prefer?"), update the prompt with user's constraints, and re-run Phase 2 (idea generation). Repeat until the user selects at least 1 idea.
+- **User wants to adjust scope** → go back to Phase 1 with refined direction.
 
 ### Phase 3: Deep Novelty Verification
 
