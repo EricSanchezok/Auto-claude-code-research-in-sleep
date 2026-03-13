@@ -50,7 +50,7 @@ See [full setup guide](#%EF%B8%8F-setup) for details and [alternative model comb
 - 🖥️ **GPU deployment** — auto rsync, screen sessions, multi-GPU parallel experiments, live monitoring
 - 🔀 **Flexible models** — default Claude × GPT-5.4, also supports [GLM + GPT, GLM + MiniMax](#-alternative-model-combinations) — no Claude API required
 - 🛑 **Human-in-the-loop** — configurable checkpoints at key decisions. `AUTO_PROCEED=true` for full autopilot, `false` to approve each step
-- 📊 **11 composable skills** — mix and match, or chain into full pipelines (`/idea-discovery`, `/auto-review-loop`, `/research-pipeline`)
+- 📊 **15 composable skills** — mix and match, or chain into full pipelines (`/idea-discovery`, `/auto-review-loop`, `/research-pipeline`)
 
 ---
 
@@ -98,10 +98,8 @@ These skills compose into a full research lifecycle. The two workflows can be us
 ```
 /research-lit → /idea-creator → /novelty-check → implement → /run-experiment → /auto-review-loop → /paper-plan → /paper-figure → /paper-write → submit
   (survey)      (brainstorm)    (verify novel)    (code)      (deploy & run)    (review & fix)      (outline)     (plots)        (LaTeX+PDF)    (done!)
-  ├──── Workflow 1: Idea Discovery ────┤              ├──── Workflow 2: Auto Loop ────┤   ├──── Workflow 3: Paper Writing (🚧 WIP) ────┤
+  ├──── Workflow 1: Idea Discovery ────┤              ├──── Workflow 2: Auto Loop ────┤   ├────── Workflow 3: Paper Writing ──────┤
 ```
-
-> 🚧 **Workflow 3 coming soon** — auto-generate publication-ready LaTeX + figures from review conclusions. See [Roadmap](#-roadmap) for details and reference projects.
 
 📝 **Blog post:** [梦中科研全流程开源](http://xhslink.com/o/2iV33fYoc7Q)
 
@@ -213,6 +211,10 @@ These skills compose into a full research lifecycle. The two workflows can be us
 | 🎨 [`pixel-art`](skills/pixel-art/SKILL.md) | Generate pixel art SVG illustrations for READMEs, docs, or slides | No |
 | 🔭 [`idea-discovery`](skills/idea-discovery/SKILL.md) | **Workflow 1 pipeline**: research-lit → idea-creator → novelty-check → research-review | Yes |
 | 🏗️ [`research-pipeline`](skills/research-pipeline/SKILL.md) | **Full pipeline**: Workflow 1 → implement → Workflow 2, from direction to submission | Yes |
+| 📐 [`paper-plan`](skills/paper-plan/SKILL.md) | Generate paper outline with claims-evidence matrix, figure plan, and citation scaffolding | Yes |
+| 📊 [`paper-figure`](skills/paper-figure/SKILL.md) | Publication-quality matplotlib/seaborn plots from experiment data, with LaTeX snippets | No |
+| ✍️ [`paper-write`](skills/paper-write/SKILL.md) | Section-by-section LaTeX generation with ICLR/NeurIPS/ICML templates | Yes |
+| 🔨 [`paper-compile`](skills/paper-compile/SKILL.md) | Compile LaTeX to PDF, auto-fix errors, submission readiness checks | No |
 
 ---
 
@@ -478,10 +480,12 @@ This lets GLM (acting as Claude Code) familiarize itself with the skill files an
 
 - [x] **Human-in-the-loop checkpoints** — idea-discovery and research-pipeline pause at key decision points for user approval. Configurable via `AUTO_PROCEED` (default: auto-continue; set `false` to always wait)
 - [x] **Alternative model combinations** — [GLM + GPT, GLM + MiniMax](#-alternative-model-combinations) fully documented with setup guides. No Claude or OpenAI API required
-- [x] **Configurable REVIEWER_MODEL** — all Codex-dependent skills support custom reviewer model (default `gpt-5.4`, also works with `o3`, `gpt-4o`, etc.)
+- [x] **Workflow 3: Paper Writing Pipeline** — full chain: `/paper-plan` → `/paper-figure` → `/paper-write` → `/paper-compile`. ICLR/NeurIPS/ICML templates, claims-evidence matrix, publication-quality figures, latexmk auto-fix. Inspired by [claude-scholar](https://github.com/Galaxy-Dawn/claude-scholar), [Research-Paper-Writing-Skills](https://github.com/Master-cai/Research-Paper-Writing-Skills), [baoyu-skills](https://github.com/jimliu/baoyu-skills)
 
 <details>
-<summary>Show 5 more completed items</summary>
+<summary>Show 6 more completed items</summary>
+
+- [x] **Configurable REVIEWER_MODEL** — all Codex-dependent skills support custom reviewer model (default `gpt-5.4`, also works with `o3`, `gpt-4o`, etc.)
 
 - [x] **Local paper library scanning** — `/research-lit` scans local `papers/` and `literature/` directories before external search, leveraging papers you've already read
 - [x] **Idea Discovery pipeline** — `/idea-discovery` orchestrates research-lit → idea-creator → novelty-check → research-review in one command, with pilot experiments on GPU
@@ -493,15 +497,6 @@ This lets GLM (acting as Claude Code) familiarize itself with the skill files an
 
 ### Planned
 
-- [ ] **Workflow 3: Paper Writing Pipeline** — the missing piece after auto-review-loop. Chain: `/paper-plan` → `/paper-figure` → `/paper-write` → `/paper-compile`
-  - `/paper-plan` — parse review conclusions + experiment results → paper outline (section claims, figure plan, citation list)
-  - `/paper-figure` — generate publication-quality matplotlib/seaborn plots from experiment JSON, plus architecture diagrams
-  - `/paper-write` — section-by-section LaTeX generation with conference templates (NeurIPS/ICML/ICLR)
-  - `/paper-compile` — latexmk compilation + error handling + PDF output
-  - **Test plan**: feed an existing accepted paper's abstract + results, generate from scratch, compare with ground truth
-  - Architecture references: [claude-scholar](https://github.com/Galaxy-Dawn/claude-scholar) (1.3k⭐, ml-paper-writing workflow + citation 4-layer verification + self-review checklist), [Research-Paper-Writing-Skills](https://github.com/Master-cai/Research-Paper-Writing-Skills) (332⭐, CCF award-winning writing methodology, references/ modular architecture, claim-evidence mapping), [baoyu-skills](https://github.com/jimliu/baoyu-skills) (8.7k⭐, Layout×Style matrix design pattern for figure generation)
-  - LaTeX references: [AI-Research-SKILLs](https://github.com/Orchestra-Research/AI-Research-SKILLs) (4k⭐, conference templates), [arxiv-latex-mcp](https://github.com/takashiishida/arxiv-latex-mcp) (100⭐, read arXiv LaTeX source), [overleafMCP-rw](https://github.com/hiufungleung/overleafMCP-rw) (Overleaf read/write via Git)
-  - Figure references: [claude-scientific-skills](https://github.com/K-Dense-AI/claude-scientific-skills) (4.6k⭐, Publication Figures skill), [mcp-server-chart](https://github.com/antvis/mcp-server-chart) (3.1k⭐, AntV official), [matplotlib_mcp](https://github.com/newsbubbles/matplotlib_mcp) (full matplotlib API via MCP)
 - [ ] **Feishu/Lark integration** — three modes, configurable per skill:
   - **Off** (default) — no Feishu, pure CLI as-is
   - **Push only** — lightweight webhook notifications at key events (experiment done, review scored, checkpoint waiting). No extra process needed, just `curl` from within skills. Mobile push, no reply

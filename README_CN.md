@@ -50,7 +50,7 @@ claude
 - 🖥️ **GPU 部署** — 自动 rsync、screen 会话、多 GPU 并行实验、实时监控
 - 🔀 **灵活模型** — 默认 Claude × GPT-5.4，也支持 [GLM + GPT、GLM + MiniMax](#-替代模型组合)——无需 Claude API
 - 🛑 **Human-in-the-loop** — 关键决策点可配置检查点。`AUTO_PROCEED=true` 全自动，`false` 逐步审批
-- 📊 **11 个可组合 skill** — 自由混搭，或串联为完整流水线（`/idea-discovery`、`/auto-review-loop`、`/research-pipeline`）
+- 📊 **15 个可组合 skill** — 自由混搭，或串联为完整流水线（`/idea-discovery`、`/auto-review-loop`、`/research-pipeline`）
 
 ---
 
@@ -98,10 +98,8 @@ claude
 ```
 /research-lit → /idea-creator → /novelty-check → 实现 → /run-experiment → /auto-review-loop → /paper-plan → /paper-figure → /paper-write → 投稿
   (调研文献)      (找idea)       (查新验证)     (写代码)   (部署跑实验)     (自动改到能投)      (大纲)        (作图)        (LaTeX+PDF)   (搞定!)
-  ├──── 工作流 1：找 Idea ────┤                 ├──── 工作流 2：自动循环 ────┤   ├──── 工作流 3：论文写作 (🚧 开发中) ────┤
+  ├──── 工作流 1：找 Idea ────┤                 ├──── 工作流 2：自动循环 ────┤   ├────── 工作流 3：论文写作 ──────┤
 ```
-
-> 🚧 **工作流 3 即将上线** — 从 review 结论自动生成出版级 LaTeX + 图表。详见 [Roadmap](#-roadmap) 了解详情和参考项目。
 
 📝 **博客：** [梦中科研全流程开源](http://xhslink.com/o/2iV33fYoc7Q)
 
@@ -175,6 +173,10 @@ claude
 | 🎨 [`pixel-art`](skills/pixel-art/SKILL.md) | 生成像素风 SVG 插图，用于 README、文档或幻灯片 | 否 |
 | 🔭 [`idea-discovery`](skills/idea-discovery/SKILL.md) | **工作流 1 全流程**：research-lit → idea-creator → novelty-check → research-review | 是 |
 | 🏗️ [`research-pipeline`](skills/research-pipeline/SKILL.md) | **完整流水线**：工作流 1 → 实现 → 工作流 2，从方向到投稿 | 是 |
+| 📐 [`paper-plan`](skills/paper-plan/SKILL.md) | 生成论文大纲：claims-evidence 矩阵、图表计划、引用规划 | 是 |
+| 📊 [`paper-figure`](skills/paper-figure/SKILL.md) | 从实验数据生成出版级 matplotlib/seaborn 图表，含 LaTeX 插入代码 | 否 |
+| ✍️ [`paper-write`](skills/paper-write/SKILL.md) | 逐 section LaTeX 生成，支持 ICLR/NeurIPS/ICML 模板 | 是 |
+| 🔨 [`paper-compile`](skills/paper-compile/SKILL.md) | 编译 LaTeX 为 PDF，自动修复错误，投稿就绪检查 | 否 |
 
 ---
 
@@ -425,10 +427,12 @@ claude
 
 - [x] **Human-in-the-loop 检查点** — idea-discovery 和 research-pipeline 在关键决策点暂停等待用户审批。通过 `AUTO_PROCEED` 配置（默认自动继续，设 `false` 则每步等确认）
 - [x] **替代模型组合** — [GLM + GPT、GLM + MiniMax](#-替代模型组合) 完整文档及配置指南。无需 Claude 或 OpenAI API
-- [x] **可配置 REVIEWER_MODEL** — 所有依赖 Codex 的 skill 支持自定义审稿模型（默认 `gpt-5.4`，也支持 `o3`、`gpt-4o` 等）
+- [x] **Workflow 3：论文写作流水线** — 完整链路：`/paper-plan` → `/paper-figure` → `/paper-write` → `/paper-compile`。支持 ICLR/NeurIPS/ICML 模板、claims-evidence 矩阵、出版级图表、latexmk 自动修复。参考 [claude-scholar](https://github.com/Galaxy-Dawn/claude-scholar)、[Research-Paper-Writing-Skills](https://github.com/Master-cai/Research-Paper-Writing-Skills)、[baoyu-skills](https://github.com/jimliu/baoyu-skills)
 
 <details>
-<summary>展开 5 项更早完成的功能</summary>
+<summary>展开 6 项更早完成的功能</summary>
+
+- [x] **可配置 REVIEWER_MODEL** — 所有依赖 Codex 的 skill 支持自定义审稿模型（默认 `gpt-5.4`，也支持 `o3`、`gpt-4o` 等）
 
 - [x] **本地论文库扫描** — `/research-lit` 在外部搜索前先扫描本地 `papers/` 和 `literature/` 目录，复用已读论文
 - [x] **Idea Discovery 流水线** — `/idea-discovery` 一键编排 research-lit → idea-creator → novelty-check → research-review，含 GPU pilot 实验
@@ -440,15 +444,6 @@ claude
 
 ### 计划中
 
-- [ ] **Workflow 3：论文写作流水线** — auto-review-loop 之后的缺失环节。链路：`/paper-plan` → `/paper-figure` → `/paper-write` → `/paper-compile`
-  - `/paper-plan` — 解析 review 结论 + 实验结果 → 论文大纲（各节 claim、图表计划、引用列表）
-  - `/paper-figure` — 从实验 JSON 生成出版级 matplotlib/seaborn 图表 + 架构图
-  - `/paper-write` — 逐 section LaTeX 生成，支持会议模板（NeurIPS/ICML/ICLR）
-  - `/paper-compile` — latexmk 编译 + 错误处理 + PDF 输出
-  - **测试方案**：喂入已中稿论文的 abstract + 实验结果，从零生成，与原文对比
-  - 架构参考：[claude-scholar](https://github.com/Galaxy-Dawn/claude-scholar)（1.3k⭐，ml-paper-writing workflow + citation 4 层验证 + self-review checklist）、[Research-Paper-Writing-Skills](https://github.com/Master-cai/Research-Paper-Writing-Skills)（332⭐，CCF 优博写作方法论，references/ 模块化架构，claim-evidence 映射）、[baoyu-skills](https://github.com/jimliu/baoyu-skills)（8.7k⭐，Layout×Style 矩阵设计模式）
-  - LaTeX 参考：[AI-Research-SKILLs](https://github.com/Orchestra-Research/AI-Research-SKILLs)（4k⭐，会议模板）、[arxiv-latex-mcp](https://github.com/takashiishida/arxiv-latex-mcp)（100⭐，读 arXiv LaTeX 源码）、[overleafMCP-rw](https://github.com/hiufungleung/overleafMCP-rw)（Overleaf 读写 via Git）
-  - 作图参考：[claude-scientific-skills](https://github.com/K-Dense-AI/claude-scientific-skills)（4.6k⭐，Publication Figures skill）、[mcp-server-chart](https://github.com/antvis/mcp-server-chart)（3.1k⭐，AntV 官方）、[matplotlib_mcp](https://github.com/newsbubbles/matplotlib_mcp)（完整 matplotlib MCP）
 - [ ] **飞书集成** — 三种模式，可按 skill 配置：
   - **关闭**（默认）— 不接飞书，纯 CLI 不变
   - **仅推送** — 关键节点（实验完成、review 出分、checkpoint 等待）发飞书 webhook 通知。无需额外进程，skill 里 `curl` 一下就行。手机收推送，不能回复
