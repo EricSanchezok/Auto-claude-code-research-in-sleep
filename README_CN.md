@@ -119,6 +119,8 @@ claude
 
 社区贡献的领域专用 skills 和外部项目。欢迎 PR——添加 `skills/your-skill/SKILL.md` 即可！
 
+> 💡 **使用方法：** 社区 skill 不会自动接入核心工作流。使用时，让你的执行者（Claude Code / OpenClaw 等）先读一遍该 skill 的 `SKILL.md`，再根据下方描述接入对应的工作流阶段。
+
 | 类型 | 名称 | 领域 | 描述 | Codex MCP？ |
 |------|------|------|------|-----------|
 | Skill | 🏗️ [`dse-loop`](skills/dse-loop/SKILL.md) | 体系结构 / EDA | 自动设计空间探索——迭代运行、分析、调参（gem5、Yosys 等）。适用于任何有可调参数的领域 | 否 |
