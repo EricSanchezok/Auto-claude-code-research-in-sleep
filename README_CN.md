@@ -552,7 +552,8 @@ cp -r obsidian-skills/.claude /path/to/your/vault/
 
 </details>
 
-### 📱 飞书/Lark 集成（可选）
+<details>
+<summary><h3>📱 飞书/Lark 集成（可选）</h3></summary>
 
 实验跑完、review 出分、checkpoint 等你审批——手机收飞书通知，不用守在终端前。
 
@@ -743,6 +744,8 @@ EOF
 **不用飞书？** 没关系——没有 `~/.claude/feishu.json` 文件时，所有 skill 行为完全不变。零开销，零副作用。
 
 > 💡 **其他 IM 平台**：推送模式的 webhook 模式适用于任何支持 incoming webhook 的服务（Slack、Discord、钉钉、企业微信）。只需改 `webhook_url` 和卡片格式。双向交互可参考 [cc-connect](https://github.com/chenhg5/cc-connect)（多平台桥接）或 [clawdbot-feishu](https://github.com/m1heng/clawdbot-feishu)。
+
+</details>
 
 ## 🎛️ 自定义
 

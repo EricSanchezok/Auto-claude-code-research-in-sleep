@@ -655,7 +655,8 @@ For standalone arXiv access, use the dedicated [`/arxiv`](skills/arxiv/SKILL.md)
 
 </details>
 
-### 📱 Feishu/Lark Integration (Optional)
+<details>
+<summary><h3>📱 Feishu/Lark Integration (Optional)</h3></summary>
 
 Get mobile notifications when experiments finish, reviews score, or checkpoints need your input — without sitting in front of the terminal.
 
@@ -846,6 +847,8 @@ Now skills will:
 **Not using Feishu?** No problem — without `~/.claude/feishu.json`, all skills behave exactly as before. Zero overhead, zero side effects.
 
 > 💡 **Alternative IM platforms**: The push-only webhook pattern works with any service that accepts incoming webhooks (Slack, Discord, DingTalk, WeChat Work). Just change the `webhook_url` and card format in `feishu-notify/SKILL.md`. For bidirectional support, see [cc-connect](https://github.com/chenhg5/cc-connect) (multi-platform bridge) or [clawdbot-feishu](https://github.com/m1heng/clawdbot-feishu).
+
+</details>
 
 ## 🎛️ Customization
 
