@@ -77,6 +77,7 @@ claude
 > | `sources` | `all` | 搜索哪些文献源：`zotero`、`obsidian`、`local`、`web`、`all`（逗号分隔） |
 > | `arxiv download` | `false` | 文献调研时下载最相关的 arXiv PDF。为 `false` 时仅获取元数据（标题、摘要、作者） |
 > | `DBLP_BIBTEX` | `true` | 从 [DBLP](https://dblp.org)/[CrossRef](https://www.crossref.org) 获取真实 BibTeX，替代 LLM 生成。杜绝幻觉引用。零安装 |
+> | `wandb` | `false` | 自动给实验脚本加 W&B 日志。设 `true` + 在 CLAUDE.md 配 `wandb_project`。`/monitor-experiment` 从 W&B 拉训练曲线 |
 >
 > ```
 > /research-pipeline "你的课题" — AUTO_PROCEED: false                          # 在 idea 选择关卡暂停
@@ -787,11 +788,12 @@ Skills 就是普通的 Markdown 文件，fork 后随意改：
 > 💡 **参数自动透传**：参数沿调用链自动向下传递。例如 `/research-pipeline "方向" — sources: zotero, arxiv download: true` 会将 `sources` 和 `arxiv download` 经 `idea-discovery` 一路传到 `research-lit`。你可以在任何层级设置下游参数——只需加 `— key: value`。
 >
 > ```
-> research-pipeline  ──→  idea-discovery  ──→  research-lit
+> research-pipeline  ──→  idea-discovery      ──→  research-lit
+>                    ──→  experiment-bridge    ──→  run-experiment
 >                    ──→  auto-review-loop
->                                         ──→  idea-creator
->                                         ──→  novelty-check
->                                         ──→  research-review
+>                                             ──→  idea-creator
+>                                             ──→  novelty-check
+>                                             ──→  research-review
 > ```
 
 ### 全流程（`research-pipeline`）
@@ -801,8 +803,9 @@ Skills 就是普通的 Markdown 文件，fork 后随意改：
 | `AUTO_PROCEED` | true | 用户不回复时自动带着最优方案继续 | → `idea-discovery` |
 | `ARXIV_DOWNLOAD` | false | 搜索后自动下载最相关的 arXiv PDF | → `idea-discovery` → `research-lit` |
 | `HUMAN_CHECKPOINT` | false | 设为 `true` 时每轮 review 后暂停等待确认 | → `auto-review-loop` |
+| `WANDB` | false | 自动给实验脚本加 W&B 日志 | → `experiment-bridge` → `run-experiment` |
 
-行内覆盖：`/research-pipeline "方向" — auto proceed: false, human checkpoint: true, arxiv download: true`
+行内覆盖：`/research-pipeline "方向" — auto proceed: false, human checkpoint: true, wandb: true`
 
 ### 自动 Review 循环（`auto-review-loop`）
 
@@ -824,6 +827,17 @@ Skills 就是普通的 Markdown 文件，fork 后随意改：
 | `ARXIV_DOWNLOAD` | false | 搜索后自动下载最相关的 arXiv PDF | → `research-lit` |
 
 行内覆盖：`/idea-discovery "方向" — pilot budget: 4h per idea, sources: zotero, arxiv download: true`
+
+### 实验桥接（`experiment-bridge`）
+
+| 常量 | 默认值 | 说明 |
+|------|--------|------|
+| `AUTO_DEPLOY` | true | 实现后自动部署实验。设 `false` 可先审查代码 |
+| `SANITY_FIRST` | true | 先跑最小实验，提前发现 bug |
+| `MAX_PARALLEL_RUNS` | 4 | 最多并行部署几个实验（受可用 GPU 限制） |
+| `WANDB` | false | 自动加 W&B 日志。需在 CLAUDE.md 配 `wandb_project` |
+
+行内覆盖：`/experiment-bridge — auto deploy: false, wandb: true`
 
 ### 文献搜索（`research-lit`）
 

@@ -77,6 +77,7 @@ claude
 > | `sources` | `all` | Which literature sources to search: `zotero`, `obsidian`, `local`, `web`, or `all` (comma-separated) |
 > | `arxiv download` | `false` | Download top relevant arXiv PDFs during literature survey. When `false`, only fetches metadata (title, abstract, authors) |
 > | `DBLP_BIBTEX` | `true` | Fetch real BibTeX from [DBLP](https://dblp.org)/[CrossRef](https://www.crossref.org) instead of LLM-generated entries. Eliminates hallucinated citations. Zero install |
+> | `wandb` | `false` | Auto-add W&B logging to experiment scripts. Set `true` + configure `wandb_project` in CLAUDE.md. `/monitor-experiment` pulls training curves from W&B |
 >
 > ```
 > /research-pipeline "your topic" — AUTO_PROCEED: false                          # pause at idea selection gate
@@ -890,11 +891,12 @@ Skills are plain Markdown files. Fork and customize:
 > 💡 **Parameter pass-through**: Parameters flow down the call chain automatically. For example, `/research-pipeline "topic" — sources: zotero, arxiv download: true` passes `sources` and `arxiv download` through `idea-discovery` all the way down to `research-lit`. You can set any downstream parameter at any level — just add `— key: value` to your command.
 >
 > ```
-> research-pipeline  ──→  idea-discovery  ──→  research-lit
+> research-pipeline  ──→  idea-discovery      ──→  research-lit
+>                    ──→  experiment-bridge    ──→  run-experiment
 >                    ──→  auto-review-loop
->                                         ──→  idea-creator
->                                         ──→  novelty-check
->                                         ──→  research-review
+>                                             ──→  idea-creator
+>                                             ──→  novelty-check
+>                                             ──→  research-review
 > ```
 
 ### Full Research Pipeline (`research-pipeline`)
@@ -904,8 +906,9 @@ Skills are plain Markdown files. Fork and customize:
 | `AUTO_PROCEED` | true | Auto-continue with top-ranked option if user doesn't respond | → `idea-discovery` |
 | `ARXIV_DOWNLOAD` | false | Download top arXiv PDFs after literature search | → `idea-discovery` → `research-lit` |
 | `HUMAN_CHECKPOINT` | false | When `true`, pause after each review round for approval | → `auto-review-loop` |
+| `WANDB` | false | Auto-add W&B logging to experiments | → `experiment-bridge` → `run-experiment` |
 
-Override inline: `/research-pipeline "topic" — auto proceed: false, human checkpoint: true, arxiv download: true`
+Override inline: `/research-pipeline "topic" — auto proceed: false, human checkpoint: true, wandb: true`
 
 ### Auto Review Loop (`auto-review-loop`)
 
@@ -927,6 +930,17 @@ Override inline: `/research-pipeline "topic" — auto proceed: false, human chec
 | `ARXIV_DOWNLOAD` | false | Download top arXiv PDFs after literature search | → `research-lit` |
 
 Override inline: `/idea-discovery "topic" — pilot budget: 4h per idea, sources: zotero, arxiv download: true`
+
+### Experiment Bridge (`experiment-bridge`)
+
+| Constant | Default | Description |
+|----------|---------|-------------|
+| `AUTO_DEPLOY` | true | Automatically deploy experiments after implementation. Set `false` to review code first |
+| `SANITY_FIRST` | true | Run smallest experiment first to catch setup bugs before full deployment |
+| `MAX_PARALLEL_RUNS` | 4 | Maximum experiments to deploy in parallel (limited by available GPUs) |
+| `WANDB` | false | Auto-add W&B logging. Requires `wandb_project` in CLAUDE.md |
+
+Override inline: `/experiment-bridge — auto deploy: false, wandb: true`
 
 ### Literature Search (`research-lit`)
 
