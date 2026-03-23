@@ -26,6 +26,31 @@
 >
 > Claude Code 的优势是快速丝滑的执行，Codex（GPT-5.4 xhigh）虽然慢但审稿更严谨深入。两者**速度 × 严谨**的互补特性，比单模型自我对话效果更好。
 
+## 🎯 不止一句 Prompt
+
+**基础模式** — 给 ARIS 一个研究方向，全自动：
+
+```
+/research-pipeline "离散扩散语言模型的 factorized gap"
+```
+
+**精准模式** — 指定一篇论文 + 一个代码库，有的放矢：
+
+```
+/research-pipeline "改进方法 X" — ref paper: https://arxiv.org/abs/2406.04329, base repo: https://github.com/org/project
+```
+
+ARIS 读论文、总结局限、克隆代码，生成的 idea 专门改进*那篇*论文、用*那套*代码。就像跟研究助手说："读这篇论文，用这个 repo，找出哪里可以做得更好。"
+
+**中稿之后** — 论文录了，准备展示：
+
+```
+/paper-slides "paper/"     # → Beamer PDF + PPTX + 演讲稿 + Q&A 预案
+/paper-poster "paper/"     # → A0/A1 海报 PDF + 可编辑 PPTX + SVG
+```
+
+> 从 idea 到论文到讲台——一条工具链。
+
 ## 📢 最近更新
 
 - **2026-03-23** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 🔧 **3 个 skill 集成到核心工作流**：`/training-check`、`/result-to-claim`、`/ablation-planner`。📦 **`compact` 模式** — 生成精简摘要文件，适合短 context 模型和 session 恢复（`— compact: true`）。🔄 **research-refine 断点续跑** — 中断后自动恢复。社区贡献 by [@JingxuanKang](https://github.com/JingxuanKang) & [@couragec](https://github.com/couragec)

@@ -26,6 +26,31 @@ Custom [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skills for 
 >
 > Claude Code's strength is fast, fluid execution; Codex (GPT-5.4 xhigh) is slower but more deliberate and rigorous in critique. These complementary styles — **speed × rigor** — produce better outcomes than either model talking to itself.
 
+## 🎯 More Than Just a Prompt
+
+**Basic mode** — give ARIS a research direction, it handles everything:
+
+```
+/research-pipeline "factorized gap in discrete diffusion LMs"
+```
+
+**Targeted mode** — point ARIS at a specific paper and codebase for focused research:
+
+```
+/research-pipeline "improve method X" — ref paper: https://arxiv.org/abs/2406.04329, base repo: https://github.com/org/project
+```
+
+ARIS reads the paper, summarizes its limitations, clones the codebase, and generates ideas that specifically improve *that* method with *that* code. Like telling a research assistant: "read this paper, use this repo, find what's missing."
+
+**After acceptance** — your paper is in, now prepare the presentation:
+
+```
+/paper-slides "paper/"     # → Beamer PDF + PPTX + speaker notes + Q&A prep
+/paper-poster "paper/"     # → A0/A1 poster PDF + editable PPTX + SVG
+```
+
+> From idea to paper to podium — one toolchain.
+
 ## 📢 What's New
 
 - **2026-03-23** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 🔧 **3 skills integrated into core workflows**: `/training-check`, `/result-to-claim`, `/ablation-planner`. 📦 **`compact` mode** — generate lean summary files for short-context models and session recovery (`— compact: true`). 🔄 **research-refine checkpoint** — auto-resume after interruption. Community contributions by [@JingxuanKang](https://github.com/JingxuanKang) & [@couragec](https://github.com/couragec)
