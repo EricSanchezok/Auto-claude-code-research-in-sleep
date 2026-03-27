@@ -44,6 +44,28 @@ ARIS 读论文 → 找弱点 → 克隆代码 → 针对*那些*弱点用*那套
 
 > 自由组合：`ref paper` 单独 = "这篇论文哪里能改进？"，`base repo` 单独 = "这个代码能做什么？"，两个都给 = "用*这个*代码改进*这篇*论文。"
 
+**🔥 Rebuttal 模式** — 审稿意见来了？别慌。ARIS 读每条意见、制定策略、起草安全的 rebuttal：
+
+```
+/rebuttal "paper/ + reviews" — venue: ICML, character limit: 5000
+```
+
+| 参数 | 默认值 | 作用 |
+|------|--------|------|
+| `venue` | `ICML` | 目标会议 |
+| `character limit` | — | **必填。** 字符限制 |
+| `quick mode` | `false` | 仅解析 + 策略（Phase 0-3），先看审稿人要什么 |
+| `auto experiment` | `false` | 自动跑补充实验（`/experiment-bridge`） |
+| `max stress test rounds` | `1` | GPT-5.4 压力测试轮数 |
+| `max followup rounds` | `3` | 每个 reviewer follow-up 上限 |
+
+三道安全门：
+- 🔒 **不编造** — 每句话有出处
+- 🔒 **不过度承诺** — 没批准的不承诺
+- 🔒 **全覆盖** — 每个审稿意见都追踪
+
+两版输出：`PASTE_READY.txt`（精确字数，直接粘贴）+ `REBUTTAL_DRAFT_rich.md`（详细版，自己改）
+
 **中稿之后** — 论文录了，准备展示：
 
 ```
@@ -51,8 +73,7 @@ ARIS 读论文 → 找弱点 → 克隆代码 → 针对*那些*弱点用*那套
 /paper-poster "paper/"     # → A0/A1 海报 PDF + 可编辑 PPTX + SVG
 ```
 
-> 从 idea 到论文到讲台——一条工具链。
->
+> *💡 从 idea 到论文到讲台到 rebuttal——一条工具链。🌱*
 > 以上是全流程——你也可以单独用任何一个工作流。已有 idea？直接进工作流 1.5。有结果了？跳到工作流 3。见[快速开始](#-快速开始)查看所有命令，[工作流](#-工作流)了解完整流程。
 
 ## 🏆 ARIS 中稿论文
@@ -66,6 +87,9 @@ ARIS 读论文 → 找弱点 → 克隆代码 → 针对*那些*弱点用*那套
 
 ## 📢 最近更新
 
+- **2026-03-27** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 📄 **IEEE 模板** — `IEEE_JOURNAL`（TPAMI/TIP/TNNLS）+ `IEEE_CONF`（ICC/GLOBECOM/INFOCOM/ICASSP）。**9 个 venue 族。** 🔎 **[Semantic Scholar](skills/semantic-scholar/SKILL.md)** — 搜索 arXiv 之外的正式发表论文（`— sources: semantic-scholar`）。社区贡献 by [@ypd666](https://github.com/ypd666)
+- **2026-03-26** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 📄 **文档输入** — 放一个 `RESEARCH_BRIEF.md` 到项目根目录，`/idea-discovery` 和 `/research-pipeline` 自动检测。复杂研究方向不用挤在一句话里。[模板](templates/RESEARCH_BRIEF_TEMPLATE.md)
+- **2026-03-24** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 📝 **[工作流 4：`/rebuttal`](skills/rebuttal/SKILL.md)** — 投稿后 rebuttal 流水线。解析 review → 原子化 → 策略 → 起草 → 安全检查 → GPT-5.4 压力测试 → 定稿（精确版 + 详细版）→ follow-up。3 道安全门。`quick mode` 仅分析。`auto experiment` 补实验。基于 5 篇成功 rebuttal 案例 + 3 轮 GPT-5.4 设计评审
 - **2026-03-23** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 🔧 **3 个 skill 集成到核心工作流**：`/training-check`、`/result-to-claim`、`/ablation-planner`。📦 **`compact` 模式**。🔄 **断点续跑**。社区贡献 by [@JingxuanKang](https://github.com/JingxuanKang) & [@couragec](https://github.com/couragec)
 - **2026-03-22** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 📋 **[模板](templates/)** + 📄 **7 个会议模板** + 🛡️ **反幻觉修复** + 🔗 **`base repo`**
 - **2026-03-22** — ![NEW](https://img.shields.io/badge/NEW-red?style=flat-square) 🔍 **[Codex + Gemini 审稿](docs/CODEX_GEMINI_REVIEW_GUIDE_CN.md)** — Codex 执行，Gemini 审稿
@@ -115,6 +139,7 @@ claude
 > /experiment-bridge                         # 工作流 1.5 — 有计划了？实现 + 部署 + 收结果
 > /auto-review-loop "你的论文主题或范围"         # 工作流 2：审稿 → 修复 → 再审，一夜完成
 > /paper-writing "NARRATIVE_REPORT.md"       # 工作流 3：研究叙事 → 精修 PDF
+> /rebuttal "paper/ + reviews" — venue: ICML  # 工作流 4：解析 review → 起草 rebuttal → follow-up
 > /research-pipeline "你的研究方向"            # 全流程：工作流 1 → 1.5 → 2 → 3 端到端
 ```
 
@@ -126,13 +151,13 @@ claude
 > |------|------|------|
 > | `AUTO_PROCEED` | `true` | 在 idea 选择关卡自动继续。设为 `false` 可在花 GPU 前手动挑选 idea |
 > | `human checkpoint` | `false` | 每轮 review 后暂停，让你查看分数、给出修改意见、跳过特定修复或提前终止 |
-> | `sources` | `all` | 搜索哪些文献源：`zotero`、`obsidian`、`local`、`web`、`all`（逗号分隔） |
+> | `sources` | `all` | 搜索哪些文献源：`zotero`、`obsidian`、`local`、`web`、`semantic-scholar`、`all`。`semantic-scholar` 需显式指定 |
 > | `arxiv download` | `false` | 文献调研时下载最相关的 arXiv PDF。为 `false` 时仅获取元数据（标题、摘要、作者） |
 > | `DBLP_BIBTEX` | `true` | 从 [DBLP](https://dblp.org)/[CrossRef](https://www.crossref.org) 获取真实 BibTeX，替代 LLM 生成。杜绝幻觉引用。零安装 |
 > | `code review` | `true` | GPT-5.4 xhigh 部署前审查实验代码。设 `false` 跳过 |
 > | `wandb` | `false` | 自动给实验脚本加 W&B 日志。设 `true` + 在 CLAUDE.md 配 `wandb_project`。`/monitor-experiment` 从 W&B 拉训练曲线 |
 > | `illustration` | `gemini` | 工作流 3 AI 作图：`gemini`（默认，需 `GEMINI_API_KEY`，[获取](https://aistudio.google.com/apikey)）、`mermaid`（免费）、`false`（跳过） |
-> | `venue` | `ICLR` | 目标会议：`ICLR`、`NeurIPS`、`ICML`、`CVPR`、`ACL`、`AAAI`、`ACM`。决定 LaTeX 样式和页数限制 |
+> | `venue` | `ICLR` | 目标会议：`ICLR`、`NeurIPS`、`ICML`、`CVPR`、`ACL`、`AAAI`、`ACM`、`IEEE_JOURNAL`、`IEEE_CONF`。决定 LaTeX 样式和页数限制 |
 > | `base repo` | `false` | GitHub 仓库 URL，克隆作为实验基础代码（如 `— base repo: https://github.com/org/project`）。没有代码？基于开源项目开发 |
 > | `compact` | `false` | 生成精简摘要文件（`IDEA_CANDIDATES.md`、`findings.md`、`EXPERIMENT_LOG.md`），适合短 context 模型和 session 恢复 |
 > | `ref paper` | `false` | 参考论文（PDF 路径或 arXiv URL）。先总结论文，再基于它找 idea。配合 `base repo` 实现"论文+代码"工作流 |
