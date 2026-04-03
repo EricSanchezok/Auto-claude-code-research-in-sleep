@@ -20,8 +20,18 @@
 > Executor acts · Reviewer critiques · Iterate to excellence
 
 [![GitHub Release](https://img.shields.io/github/v/release/wanshuiyin/Auto-claude-code-research-in-sleep?style=flat-square)](https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep/releases)
-[![Platform](https://img.shields.io/badge/platform-macOS%20Apple%20Silicon-black?style=flat-square&logo=apple)](https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep)
+[![Platform](https://img.shields.io/badge/platform-macOS%20|%20Linux-black?style=flat-square&logo=apple)](https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
+
+## 📰 What's New
+
+> **v0.2.1** (2026-04-03) — 🧠 Persistent Memory · cross-session context via `~/.config/aris/memory.md` | 🔧 Kimi K2.5 multi-turn tool call fix | 🈶 CJK cursor positioning fix | 📦 Banner box frame
+>
+> **v0.2.0** (2026-04-02) — 🔓 Open source release | 🤖 Kimi K2.5 + MiniMax M2.7 + GLM-5 support | 🔀 Smart LlmReview routing by model name | 🌐 CI/CD for macOS ARM64/x64 + Linux x64 | 🌍 Language setting (CN/EN)
+>
+> **v0.1.0** (2026-04-02) — 🎉 Initial release | Multi-executor & multi-reviewer | 42 bundled skills | Interactive setup & menus | `/skills` system | Pixel art banner
+>
+> [Full Changelog →](CHANGELOG.md)
 
 ---
 
