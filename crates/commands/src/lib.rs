@@ -76,6 +76,18 @@ const SLASH_COMMAND_SPECS: &[SlashCommandSpec] = &[
         resume_supported: false,
     },
     SlashCommandSpec {
+        name: "plan",
+        summary: "Create a step-by-step plan before executing",
+        argument_hint: Some("<task>"),
+        resume_supported: false,
+    },
+    SlashCommandSpec {
+        name: "tasks",
+        summary: "View or manage persistent task list",
+        argument_hint: Some("[show|clear]"),
+        resume_supported: false,
+    },
+    SlashCommandSpec {
         name: "skills",
         summary: "List, show, or export skills",
         argument_hint: Some("[list|show <name>|export <name>]"),
@@ -244,6 +256,12 @@ pub enum SlashCommand {
         target: Option<String>,
     },
     Setup,
+    Plan {
+        task: Option<String>,
+    },
+    Tasks {
+        action: Option<String>,
+    },
     Skills {
         action: Option<String>,
         target: Option<String>,
@@ -309,6 +327,12 @@ impl SlashCommand {
             "diff" => Self::Diff,
             "version" => Self::Version,
             "setup" => Self::Setup,
+            "plan" => Self::Plan {
+                task: remainder_after_command(trimmed, command),
+            },
+            "tasks" => Self::Tasks {
+                action: remainder_after_command(trimmed, command),
+            },
             "skills" => Self::Skills {
                 action: parts.next().map(ToOwned::to_owned),
                 target: parts.next().map(ToOwned::to_owned),
@@ -414,6 +438,8 @@ pub fn handle_slash_command(
         | SlashCommand::Model { .. }
         | SlashCommand::Reviewer { .. }
         | SlashCommand::Setup
+        | SlashCommand::Plan { .. }
+        | SlashCommand::Tasks { .. }
         | SlashCommand::Skills { .. }
         | SlashCommand::Permissions { .. }
         | SlashCommand::Clear { .. }
@@ -564,7 +590,7 @@ mod tests {
         assert!(help.contains("/version"));
         assert!(help.contains("/export [file]"));
         assert!(help.contains("/session [list|switch <session-id>]"));
-        assert_eq!(slash_command_specs().len(), 25);
+        assert_eq!(slash_command_specs().len(), 27);
         assert_eq!(resume_supported_slash_commands().len(), 11);
     }
 

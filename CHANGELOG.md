@@ -1,5 +1,10 @@
 # ARIS-Code Changelog
 
+## v0.2.2 (2026-04-03)
+
+- **`/plan` command**: Create step-by-step research plans before executing. Model presents numbered steps and waits for confirmation.
+- **`/tasks` command**: Persistent task tracking via `~/.config/aris/tasks.md`. Auto-managed by the model with `- [ ]` / `- [x]` checklist format. Use `/tasks` to view, `/tasks clear` to reset.
+
 ## v0.2.1 (2026-04-03)
 
 - **Persistent Memory**: ARIS now remembers context across sessions via `~/.config/aris/memory.md`. Say "remember this" and it persists. No extra setup needed.

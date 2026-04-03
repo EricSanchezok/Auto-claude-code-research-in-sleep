@@ -977,6 +977,8 @@ fn run_resume_command(
         | SlashCommand::Model { .. }
         | SlashCommand::Reviewer { .. }
         | SlashCommand::Setup
+        | SlashCommand::Plan { .. }
+        | SlashCommand::Tasks { .. }
         | SlashCommand::Skills { .. }
         | SlashCommand::Permissions { .. }
         | SlashCommand::Session { .. }
@@ -1397,6 +1399,21 @@ impl LiveCli {
             SlashCommand::Model { model } => self.set_model(model)?,
             SlashCommand::Reviewer { model } => self.set_reviewer(model)?,
             SlashCommand::Setup => self.run_inline_setup()?,
+            SlashCommand::Plan { task } => {
+                let task_desc = task.unwrap_or_else(|| "the user's request".to_string());
+                let plan_prompt = format!(
+                    "Create a detailed step-by-step plan for: {task_desc}\n\n\
+                     Format as a numbered list. For each step, explain what you'll do and why.\n\
+                     After presenting the plan, ask for confirmation before executing.\n\
+                     Do NOT start executing until the user confirms."
+                );
+                self.run_turn(&plan_prompt)?;
+                false
+            }
+            SlashCommand::Tasks { action } => {
+                Self::handle_tasks(action.as_deref())?;
+                false
+            }
             SlashCommand::Skills { action, target } => {
                 Self::handle_skills(action.as_deref(), target.as_deref())?;
                 false
@@ -1693,6 +1710,35 @@ impl LiveCli {
         }
 
         Ok(true)
+    }
+
+    fn handle_tasks(action: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
+        let tasks_path = aris_tasks_path();
+        match action {
+            Some("clear") => {
+                if tasks_path.exists() {
+                    fs::remove_file(&tasks_path)?;
+                    println!("\x1b[1;32m✓\x1b[0m Tasks cleared.");
+                } else {
+                    println!("No tasks file to clear.");
+                }
+            }
+            _ => {
+                if tasks_path.exists() {
+                    let content = fs::read_to_string(&tasks_path)?;
+                    if content.trim().is_empty() {
+                        println!("\x1b[2mNo tasks yet. The model will create tasks automatically, or say \"add task: xxx\".\x1b[0m");
+                    } else {
+                        println!("\x1b[1mTasks\x1b[0m ({})\n", tasks_path.display());
+                        println!("{content}");
+                    }
+                } else {
+                    println!("\x1b[2mNo tasks yet. The model will create tasks automatically, or say \"add task: xxx\".\x1b[0m");
+                    println!("\x1b[2mFile: {}\x1b[0m", tasks_path.display());
+                }
+            }
+        }
+        Ok(())
     }
 
     fn handle_skills(
@@ -2863,7 +2909,41 @@ fn build_system_prompt(model_id: Option<&str>) -> Result<Vec<String>, Box<dyn st
         ));
     }
 
+    // ARIS persistent tasks
+    let tasks_path = aris_tasks_path();
+    if tasks_path.exists() {
+        if let Ok(content) = fs::read_to_string(&tasks_path) {
+            if !content.trim().is_empty() {
+                prompt.push(format!(
+                    "# ARIS Task List\n\
+                     Current tasks from {}:\n\n{}\n\n\
+                     Update this file when tasks are completed or new ones are added. \
+                     Use the write_file tool to modify {}.",
+                    tasks_path.display(),
+                    content.trim(),
+                    tasks_path.display(),
+                ));
+            }
+        }
+    } else {
+        prompt.push(format!(
+            "# ARIS Task List\n\
+             You can track tasks in {}. \
+             When the user says \"add task\" or you identify action items, \
+             create this file with a markdown checklist (- [ ] / - [x] format).",
+            tasks_path.display(),
+        ));
+    }
+
     Ok(prompt)
+}
+
+fn aris_tasks_path() -> PathBuf {
+    let home = env::var("HOME").unwrap_or_else(|_| ".".into());
+    PathBuf::from(home)
+        .join(".config")
+        .join("aris")
+        .join("tasks.md")
 }
 
 fn aris_memory_path() -> PathBuf {

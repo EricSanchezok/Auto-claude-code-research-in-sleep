@@ -20,18 +20,8 @@
 > Executor 执行 · Reviewer 审查 · 迭代精进
 
 [![GitHub Release](https://img.shields.io/github/v/release/wanshuiyin/Auto-claude-code-research-in-sleep?style=flat-square)](https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep/releases)
-[![Platform](https://img.shields.io/badge/platform-macOS%20|%20Linux-black?style=flat-square&logo=apple)](https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep)
+[![Platform](https://img.shields.io/badge/platform-macOS%20Apple%20Silicon-black?style=flat-square&logo=apple)](https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
-
-## 📰 最新动态
-
-> **v0.2.1** (2026-04-03) — 🧠 持久记忆：跨 session 上下文 `~/.config/aris/memory.md` | 🔧 Kimi K2.5 多轮工具调用修复 | 🈶 中文输入光标修复 | 📦 启动界面加框
->
-> **v0.2.0** (2026-04-02) — 🔓 开源发布 | 🤖 Kimi K2.5 + MiniMax M2.7 + GLM-5 支持 | 🔀 LlmReview 按模型名智能路由 | 🌐 CI/CD 三平台自动编译 | 🌍 语言设置
->
-> **v0.1.0** (2026-04-02) — 🎉 首次发布 | 多执行者 & 多审阅者 | 42 个内置技能 | 交互式配置 | `/skills` 系统 | 像素小人
->
-> [完整更新日志 →](CHANGELOG.md)
 
 ---
 
@@ -50,7 +40,7 @@
 ## 🚀 安装（macOS Apple Silicon）
 
 ```bash
-curl -fsSL https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep/releases/latest/download/aris-code-darwin-arm64.tar.gz | tar xz
+curl -fsSL https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep/releases/download/v0.1.0/aris-code-darwin-arm64.tar.gz | tar xz
 sudo mv aris-code /usr/local/bin/aris
 aris
 ```
