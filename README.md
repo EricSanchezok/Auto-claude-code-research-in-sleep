@@ -26,7 +26,7 @@
 
 ## 📰 What's New
 
-> **v0.3.1** (2026-04-04) — Fix StructuredOutput schema for OpenAI/Kimi executor compatibility
+> **v0.3.2** (2026-04-04) — Fix hooks compatibility with Claude Code settings | Fix install permissions
 >
 > <details><summary>Previous versions</summary>
 >
