@@ -26,7 +26,7 @@
 
 ## 📰 最新动态
 
-> **v0.3.1** (2026-04-04) — 修复 StructuredOutput schema，兼容 OpenAI/Kimi 执行者
+> **v0.3.2** (2026-04-04) — 修复 Claude Code hooks 配置兼容性 | 修复安装权限
 >
 > <details><summary>历史版本</summary>
 >
