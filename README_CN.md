@@ -26,7 +26,7 @@
 
 ## 📰 最新动态
 
-> **v0.3.2** (2026-04-04) — 修复 Claude Code hooks 配置兼容性 | 修复安装权限
+> **v0.3.3** (2026-04-04) — 修复所有 Claude Code hooks 配置崩溃路径
 >
 > <details><summary>历史版本</summary>
 >
