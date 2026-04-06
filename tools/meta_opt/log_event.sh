@@ -1,25 +1,29 @@
 #!/usr/bin/env bash
 # ARIS Meta-Optimize: Event Logger
 # Reads Claude Code hook JSON from stdin, extracts key fields,
-# appends structured event to .aris/meta/events.jsonl
+# appends structured event to BOTH project-level and global logs.
 #
 # Called automatically by Claude Code hooks (PostToolUse, UserPromptSubmit, etc.)
 # Input: JSON via stdin (Claude Code hook payload)
-# Output: Appends one JSONL line to $PROJECT/.aris/meta/events.jsonl
+# Output:
+#   Project: $CLAUDE_PROJECT_DIR/.aris/meta/events.jsonl  (project-specific details)
+#   Global:  ~/.aris/meta/events.jsonl                    (cross-project trends)
 
 set -euo pipefail
 
-ARIS_META_DIR="${CLAUDE_PROJECT_DIR:-.}/.aris/meta"
-mkdir -p "$ARIS_META_DIR"
+PROJECT_META="${CLAUDE_PROJECT_DIR:-.}/.aris/meta"
+GLOBAL_META="$HOME/.aris/meta"
+mkdir -p "$PROJECT_META" "$GLOBAL_META"
 
 # Read stdin payload into env var (cannot use heredoc + herestring simultaneously)
 export ARIS_HOOK_PAYLOAD="$(cat)"
 
-python3 - "$ARIS_META_DIR/events.jsonl" << 'PYEOF'
+python3 - "$PROJECT_META/events.jsonl" "$GLOBAL_META/events.jsonl" << 'PYEOF'
 import json, sys, os
 from datetime import datetime, timezone
 
-log_file = sys.argv[1]
+project_log = sys.argv[1]
+global_log = sys.argv[2]
 
 raw = os.environ.get("ARIS_HOOK_PAYLOAD", "").strip()
 if not raw:
@@ -31,6 +35,7 @@ except json.JSONDecodeError:
 
 event_name = p.get("hook_event_name", "unknown")
 session_id = p.get("session_id", "")
+project_dir = os.environ.get("CLAUDE_PROJECT_DIR", "")
 ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 record = {"ts": ts, "session": session_id, "event": event_name}
@@ -43,7 +48,6 @@ if event_name in ("PostToolUse", "PostToolUseFailure"):
     if event_name == "PostToolUseFailure":
         record["event"] = "tool_failure"
 
-    # Detect skill invocations
     if tool_name == "Skill":
         record["event"] = "skill_invoke"
         record["skill"] = tool_input.get("skill", "")
@@ -75,6 +79,13 @@ elif event_name == "SessionStart":
 elif event_name == "SessionEnd":
     record["event"] = "session_end"
 
-with open(log_file, "a") as f:
+# Write to project-level log
+with open(project_log, "a") as f:
     f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+# Write to global log with project tag
+global_record = record.copy()
+global_record["project"] = os.path.basename(project_dir) if project_dir else "unknown"
+with open(global_log, "a") as f:
+    f.write(json.dumps(global_record, ensure_ascii=False) + "\n")
 PYEOF
