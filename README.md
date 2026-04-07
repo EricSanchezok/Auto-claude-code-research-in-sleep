@@ -4,7 +4,7 @@
 
 🔥 [**ARIS-Code CLI — 独立安装版**](docs/ARIS-Code-README_CN.md) · [English](docs/ARIS-Code-README_EN.md) | [⬇️ Download](https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep/releases/latest)
 
-> 📰 **ARIS-Code v0.3.3** (2026-04-04) — Fix all config loading crashes for Claude Code hooks compatibility
+> 📰 **ARIS-Code v0.3.4** (2026-04-08) — Meta-Optimize self-evolution | Atomic session writes | Bash safety validation | Windows support (experimental)
 >
 > <details><summary>Previous versions</summary>
 >
