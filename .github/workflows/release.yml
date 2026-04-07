@@ -22,6 +22,9 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             artifact: aris-code-linux-x64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: aris-code-windows-x64
 
     runs-on: ${{ matrix.os }}
 
@@ -36,12 +39,21 @@ jobs:
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Package
+      - name: Package (Unix)
+        if: runner.os != 'Windows'
         run: |
           cp target/${{ matrix.target }}/release/aris aris
           chmod +x aris
           tar czf ${{ matrix.artifact }}.tar.gz aris
           shasum -a 256 ${{ matrix.artifact }}.tar.gz > ${{ matrix.artifact }}.tar.gz.sha256
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Copy-Item "target/${{ matrix.target }}/release/aris.exe" "aris.exe"
+          Compress-Archive -Path "aris.exe" -DestinationPath "${{ matrix.artifact }}.zip"
+          (Get-FileHash "${{ matrix.artifact }}.zip" -Algorithm SHA256).Hash.ToLower() + "  ${{ matrix.artifact }}.zip" | Out-File "${{ matrix.artifact }}.zip.sha256" -Encoding ASCII
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -50,6 +62,8 @@ jobs:
           path: |
             ${{ matrix.artifact }}.tar.gz
             ${{ matrix.artifact }}.tar.gz.sha256
+            ${{ matrix.artifact }}.zip
+            ${{ matrix.artifact }}.zip.sha256
 
   release:
     needs: build
@@ -71,4 +85,6 @@ jobs:
             aris-code-darwin-x64.tar.gz.sha256
             aris-code-linux-x64.tar.gz
             aris-code-linux-x64.tar.gz.sha256
+            aris-code-windows-x64.zip
+            aris-code-windows-x64.zip.sha256
           generate_release_notes: true

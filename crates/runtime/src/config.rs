@@ -43,6 +43,24 @@ pub struct RuntimeFeatureConfig {
     model: Option<String>,
     permission_mode: Option<ResolvedPermissionMode>,
     sandbox: SandboxConfig,
+    meta_logging: String,
+}
+
+impl RuntimeFeatureConfig {
+    /// Get the meta-logging level string (off/metadata/content).
+    #[must_use]
+    pub fn meta_logging(&self) -> &str {
+        if self.meta_logging.is_empty() {
+            "off"
+        } else {
+            &self.meta_logging
+        }
+    }
+
+    /// Set meta-logging level.
+    pub fn set_meta_logging(&mut self, level: impl Into<String>) {
+        self.meta_logging = level.into();
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -236,6 +254,7 @@ impl ConfigLoader {
             model: parse_optional_model(&merged_value),
             permission_mode: parse_optional_permission_mode(&merged_value)?,
             sandbox: parse_optional_sandbox_config(&merged_value)?,
+            meta_logging: String::new(),
         };
 
         Ok(RuntimeConfig {

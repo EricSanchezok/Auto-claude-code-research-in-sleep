@@ -65,6 +65,11 @@ pub struct BashCommandOutput {
 }
 
 pub fn execute_bash(input: BashCommandInput) -> io::Result<BashCommandOutput> {
+    // Pre-execution safety check
+    if let Some(rejection) = check_dangerous_command(&input.command) {
+        return Err(io::Error::new(io::ErrorKind::PermissionDenied, rejection));
+    }
+
     let cwd = env::current_dir()?;
     let sandbox_status = sandbox_status_for_input(&input, &cwd);
 
@@ -236,6 +241,55 @@ fn prepare_tokio_command(
 fn prepare_sandbox_dirs(cwd: &std::path::Path) {
     let _ = std::fs::create_dir_all(cwd.join(".sandbox-home"));
     let _ = std::fs::create_dir_all(cwd.join(".sandbox-tmp"));
+}
+
+/// Check for dangerous bash command patterns. Returns rejection reason or None.
+fn check_dangerous_command(command: &str) -> Option<String> {
+    let normalized = command.to_ascii_lowercase();
+    let tokens: Vec<&str> = normalized.split_whitespace().collect();
+
+    // Patterns that are always dangerous
+    const DANGEROUS_PATTERNS: &[(&str, &str)] = &[
+        ("rm -rf /", "recursive deletion of root filesystem"),
+        ("rm -rf /*", "recursive deletion of root filesystem"),
+        ("rm -rf ~", "recursive deletion of home directory"),
+        ("mkfs", "filesystem formatting"),
+        ("dd if=/dev/zero", "disk overwrite"),
+        ("dd if=/dev/random", "disk overwrite"),
+        (":(){:|:&};:", "fork bomb"),
+        ("chmod -r 777 /", "recursive permission change on root"),
+        ("chown -r", "recursive ownership change"),
+    ];
+
+    for (pattern, reason) in DANGEROUS_PATTERNS {
+        if normalized.contains(pattern) {
+            return Some(format!(
+                "Blocked: command matches dangerous pattern ({reason}): {pattern}"
+            ));
+        }
+    }
+
+    // Check for sudo + destructive commands
+    if tokens.first() == Some(&"sudo") || normalized.contains("| sudo") {
+        let after_sudo = if tokens.first() == Some(&"sudo") {
+            tokens.get(1).copied().unwrap_or("")
+        } else {
+            // Find command after "| sudo"
+            normalized
+                .split("| sudo")
+                .nth(1)
+                .and_then(|s| s.split_whitespace().next())
+                .unwrap_or("")
+        };
+        const SUDO_BLOCKED: &[&str] = &["rm", "mkfs", "dd", "chmod", "chown", "fdisk", "parted"];
+        if SUDO_BLOCKED.iter().any(|cmd| after_sudo == *cmd) {
+            return Some(format!(
+                "Blocked: sudo with destructive command '{after_sudo}'"
+            ));
+        }
+    }
+
+    None
 }
 
 #[cfg(test)]

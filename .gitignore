@@ -5,3 +5,15 @@ target/
 .config/
 *.env
 *.key
+
+# Build artifacts
+target/
+dist/
+
+# Tool caches
+.clawd-*
+.omc/
+.sandbox-home/
+.sandbox-tmp/
+.DS_Store
+.claude/sessions/

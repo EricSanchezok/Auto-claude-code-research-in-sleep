@@ -2,6 +2,7 @@ mod config;
 mod init;
 mod input;
 mod memories;
+mod meta_optimize;
 mod openai_executor;
 mod render;
 
@@ -984,6 +985,7 @@ fn run_resume_command(
         | SlashCommand::Skills { .. }
         | SlashCommand::Permissions { .. }
         | SlashCommand::Session { .. }
+        | SlashCommand::MetaOptimize { .. }
         | SlashCommand::Unknown { .. } => Err("unsupported resumed slash command".into()),
     }
 }
@@ -1453,6 +1455,10 @@ impl LiveCli {
             }
             SlashCommand::Session { action, target } => {
                 self.handle_session_command(action.as_deref(), target.as_deref())?
+            }
+            SlashCommand::MetaOptimize { action, target } => {
+                self.handle_meta_optimize(action.as_deref(), target.as_deref())?;
+                false
             }
             SlashCommand::Unknown { ref name, ref args } => {
                 // Try to resolve as a skill invocation
@@ -2031,6 +2037,47 @@ impl LiveCli {
                 Ok(false)
             }
         }
+    }
+
+    fn handle_meta_optimize(
+        &mut self,
+        action: Option<&str>,
+        target: Option<&str>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        match action {
+            Some("apply") => {
+                let Some(id_str) = target else {
+                    println!("Usage: /meta-optimize apply <proposal-number>");
+                    return Ok(());
+                };
+                let id: usize = id_str.parse().map_err(|_| {
+                    format!("Invalid proposal number: {id_str}")
+                })?;
+                match meta_optimize::apply_proposal(id) {
+                    Ok(msg) => println!("{msg}"),
+                    Err(e) => eprintln!("\x1b[1;31mError\x1b[0m: {e}"),
+                }
+            }
+            Some("status") | None => {
+                match meta_optimize::status_report() {
+                    Ok(report) => println!("{report}"),
+                    Err(e) => eprintln!("\x1b[1;31mError\x1b[0m: {e}"),
+                }
+            }
+            Some(other) => {
+                // Anything else (e.g., a skill name or "all") → run as skill invocation
+                let args = if let Some(t) = target {
+                    format!("{other} {t}")
+                } else {
+                    other.to_string()
+                };
+                let prompt = format!(
+                    "Use the Skill tool to invoke the skill named \"meta-optimize\" with arguments: {args}. Follow the skill instructions precisely."
+                );
+                self.run_turn(&prompt)?;
+            }
+        }
+        Ok(())
     }
 
     fn compact(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -3026,14 +3073,31 @@ fn build_runtime(
             )?)
         };
 
+    let feature_config = build_runtime_feature_config()?;
+    let event_sink = build_event_sink(&feature_config);
     Ok(ConversationRuntime::new_with_features(
         session,
         executor,
         CliToolExecutor::new(allowed_tools, emit_output),
         permission_policy(permission_mode),
         system_prompt,
-        build_runtime_feature_config()?,
-    ))
+        feature_config,
+    )
+    .with_event_sink(event_sink))
+}
+
+fn build_event_sink(
+    _feature_config: &runtime::RuntimeFeatureConfig,
+) -> Box<dyn runtime::EventSink> {
+    let level_str = std::env::var("ARIS_META_LOGGING")
+        .unwrap_or_default();
+    let level = runtime::MetaLoggingLevel::parse(&level_str);
+    if level == runtime::MetaLoggingLevel::Off {
+        return Box::new(runtime::NoopEventSink);
+    }
+    let path = runtime::JsonlEventSink::default_path();
+    let session_id = std::env::var("ARIS_SESSION_ID").unwrap_or_default();
+    Box::new(runtime::JsonlEventSink::new(path, level, session_id))
 }
 
 struct CliPermissionPrompter {

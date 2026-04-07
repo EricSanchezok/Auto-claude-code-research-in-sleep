@@ -26,9 +26,11 @@
 
 ## 📰 最新动态
 
-> **v0.3.3** (2026-04-04) — 修复所有 Claude Code hooks 配置崩溃路径
+> **v0.3.4** (2026-04-08) — Workflow M: 自进化 Meta-Optimize | Session 原子写入 | Bash 安全校验 | Windows 支持 (experimental)
 >
 > <details><summary>历史版本</summary>
+>
+> **v0.3.3** (2026-04-04) — 修复所有 Claude Code hooks 配置崩溃路径
 >
 > **v0.3.0** (2026-04-03) — 多文件记忆索引 | 结构化任务系统 (TodoWrite) | `/plan` | 安全加固
 >

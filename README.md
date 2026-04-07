@@ -26,9 +26,11 @@
 
 ## 📰 What's New
 
-> **v0.3.3** (2026-04-04) — Fix all config loading crashes for Claude Code hooks compatibility
+> **v0.3.4** (2026-04-08) — Workflow M: Self-evolving Meta-Optimize | Atomic session writes | Bash safety validation | Windows support (experimental)
 >
 > <details><summary>Previous versions</summary>
+>
+> **v0.3.3** (2026-04-04) — Fix all config loading crashes for Claude Code hooks compatibility
 >
 > **v0.3.0** (2026-04-03) — Multi-file memory index | Rich task system (TodoWrite) | `/plan` | Security hardening
 >

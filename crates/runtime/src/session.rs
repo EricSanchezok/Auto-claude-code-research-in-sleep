@@ -85,8 +85,32 @@ impl Session {
         }
     }
 
+    /// Save session to disk with atomic write (temp + rename) and rotation.
+    /// Files exceeding 256 KB are archived (up to 3 backups).
     pub fn save_to_path(&self, path: impl AsRef<Path>) -> Result<(), SessionError> {
-        fs::write(path, self.to_json().render())?;
+        let path = path.as_ref();
+        let data = self.to_json().render();
+
+        // Ensure parent directory exists
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+
+        // Rotate if existing file exceeds 256 KB
+        const MAX_SESSION_BYTES: u64 = 256 * 1024;
+        const MAX_ARCHIVES: usize = 3;
+        if path.exists() {
+            if let Ok(meta) = fs::metadata(path) {
+                if meta.len() > MAX_SESSION_BYTES {
+                    rotate_session_file(path, MAX_ARCHIVES);
+                }
+            }
+        }
+
+        // Atomic write: temp file + rename
+        let tmp_path = path.with_extension("json.tmp");
+        fs::write(&tmp_path, &data)?;
+        fs::rename(&tmp_path, path)?;
         Ok(())
     }
 
@@ -374,6 +398,22 @@ fn required_u32(object: &BTreeMap<String, JsonValue>, key: &str) -> Result<u32, 
         .and_then(JsonValue::as_i64)
         .ok_or_else(|| SessionError::Format(format!("missing {key}")))?;
     u32::try_from(value).map_err(|_| SessionError::Format(format!("{key} out of range")))
+}
+
+/// Rotate a session file: foo.json → foo.json.1, foo.json.1 → foo.json.2, etc.
+/// Keeps at most `max_archives` backups.
+fn rotate_session_file(path: &Path, max_archives: usize) {
+    // Shift existing archives: .3 → delete, .2 → .3, .1 → .2
+    for i in (1..max_archives).rev() {
+        let older = path.with_extension(format!("json.{}", i + 1));
+        let newer = path.with_extension(format!("json.{i}"));
+        if newer.exists() {
+            let _ = fs::rename(&newer, &older);
+        }
+    }
+    // Current → .1
+    let first_archive = path.with_extension("json.1");
+    let _ = fs::rename(path, &first_archive);
 }
 
 #[cfg(test)]

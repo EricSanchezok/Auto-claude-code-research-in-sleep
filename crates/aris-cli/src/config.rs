@@ -33,6 +33,9 @@ pub struct ArisConfig {
     /// "cn" or "en"
     #[serde(default)]
     pub language: Option<String>,
+    /// Meta-logging level: "off", "metadata", or "content"
+    #[serde(default)]
+    pub meta_logging: Option<String>,
 }
 
 impl ArisConfig {
@@ -166,6 +169,13 @@ impl ArisConfig {
         if force || std::env::var("ARIS_LANGUAGE").is_err() {
             if let Some(lang) = &self.language {
                 std::env::set_var("ARIS_LANGUAGE", lang);
+            }
+        }
+
+        // Meta-logging
+        if force || std::env::var("ARIS_META_LOGGING").is_err() {
+            if let Some(level) = &self.meta_logging {
+                std::env::set_var("ARIS_META_LOGGING", level);
             }
         }
     }

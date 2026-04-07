@@ -201,6 +201,12 @@ const SLASH_COMMAND_SPECS: &[SlashCommandSpec] = &[
         argument_hint: Some("[list|switch <session-id>]"),
         resume_supported: false,
     },
+    SlashCommandSpec {
+        name: "meta-optimize",
+        summary: "Analyze usage logs and optimize ARIS skills",
+        argument_hint: Some("[apply <N>|status]"),
+        resume_supported: false,
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -263,6 +269,10 @@ pub enum SlashCommand {
         action: Option<String>,
     },
     Skills {
+        action: Option<String>,
+        target: Option<String>,
+    },
+    MetaOptimize {
         action: Option<String>,
         target: Option<String>,
     },
@@ -341,6 +351,10 @@ impl SlashCommand {
                 path: parts.next().map(ToOwned::to_owned),
             },
             "session" => Self::Session {
+                action: parts.next().map(ToOwned::to_owned),
+                target: parts.next().map(ToOwned::to_owned),
+            },
+            "meta-optimize" => Self::MetaOptimize {
                 action: parts.next().map(ToOwned::to_owned),
                 target: parts.next().map(ToOwned::to_owned),
             },
@@ -452,6 +466,7 @@ pub fn handle_slash_command(
         | SlashCommand::Version
         | SlashCommand::Export { .. }
         | SlashCommand::Session { .. }
+        | SlashCommand::MetaOptimize { .. }
         | SlashCommand::Unknown { .. } => None,
     }
 }

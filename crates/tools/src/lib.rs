@@ -537,6 +537,10 @@ fn io_to_string(error: std::io::Error) -> String {
     error.to_string()
 }
 
+fn is_symlink(path: &std::path::Path) -> bool {
+    std::fs::symlink_metadata(path).is_ok_and(|m| m.file_type().is_symlink())
+}
+
 #[derive(Debug, Deserialize)]
 struct ReadFileInput {
     path: String,
@@ -1345,12 +1349,17 @@ fn todo_store_path() -> Result<std::path::PathBuf, String> {
 fn skill_search_roots() -> Vec<std::path::PathBuf> {
     let mut roots = Vec::new();
 
-    // 1. ~/.claude/skills/ (user-level, highest priority)
+    // 1. ~/.config/aris/skills/ (ARIS user-level, highest priority)
+    if let Ok(home) = std::env::var("HOME") {
+        roots.push(std::path::PathBuf::from(&home).join(".config").join("aris").join("skills"));
+    }
+
+    // 2. ~/.claude/skills/ (Claude Code compat, user-level)
     if let Ok(home) = std::env::var("HOME") {
         roots.push(std::path::PathBuf::from(&home).join(".claude").join("skills"));
     }
 
-    // 2. Project-level .claude/skills/
+    // 3. Project-level .claude/skills/
     if let Ok(cwd) = std::env::current_dir() {
         roots.push(cwd.join(".claude").join("skills"));
     }
@@ -1378,19 +1387,27 @@ fn resolve_skill_path(skill: &str) -> Result<std::path::PathBuf, String> {
     if requested.is_empty() {
         return Err(String::from("skill must not be empty"));
     }
+    // Reject path traversal attempts
+    if requested.contains("..") || requested.contains('/') || requested.contains('\\') {
+        return Err(format!("invalid skill name: {requested}"));
+    }
 
     for root in skill_search_roots() {
         // Direct match: root/<skill>/SKILL.md
         let direct = root.join(requested).join("SKILL.md");
-        if direct.exists() {
+        if direct.exists() && !is_symlink(&direct) {
             return Ok(direct);
         }
 
         // Case-insensitive scan
         if let Ok(entries) = std::fs::read_dir(&root) {
             for entry in entries.flatten() {
+                // Reject symlinks to prevent directory traversal
+                if is_symlink(&entry.path()) {
+                    continue;
+                }
                 let path = entry.path().join("SKILL.md");
-                if !path.exists() {
+                if !path.exists() || is_symlink(&path) {
                     continue;
                 }
                 if entry
@@ -1428,8 +1445,12 @@ pub fn discover_skills() -> Vec<SkillMeta> {
             Err(_) => continue,
         };
         for entry in entries.flatten() {
+            // Reject symlinks to prevent directory traversal
+            if is_symlink(&entry.path()) {
+                continue;
+            }
             let skill_md = entry.path().join("SKILL.md");
-            if !skill_md.exists() {
+            if !skill_md.exists() || is_symlink(&skill_md) {
                 continue;
             }
             let name = entry.file_name().to_string_lossy().to_string();

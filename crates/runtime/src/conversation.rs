@@ -5,6 +5,7 @@ use crate::compact::{
     compact_session, estimate_session_tokens, CompactionConfig, CompactionResult,
 };
 use crate::config::RuntimeFeatureConfig;
+use crate::event_sink::{EventSink, EventType, NoopEventSink, RuntimeEvent, now_iso8601};
 use crate::hooks::{HookRunResult, HookRunner};
 use crate::permissions::{PermissionOutcome, PermissionPolicy, PermissionPrompter};
 use crate::session::{ContentBlock, ConversationMessage, Session};
@@ -107,6 +108,7 @@ pub struct ConversationRuntime<C, T> {
     usage_tracker: UsageTracker,
     hook_runner: HookRunner,
     auto_compaction_input_tokens_threshold: u32,
+    event_sink: Box<dyn EventSink>,
 }
 
 impl<C, T> ConversationRuntime<C, T>
@@ -152,7 +154,15 @@ where
             usage_tracker,
             hook_runner: HookRunner::from_feature_config(&feature_config),
             auto_compaction_input_tokens_threshold: auto_compaction_threshold_from_env(),
+            event_sink: Box::new(NoopEventSink),
         }
+    }
+
+    /// Attach an event sink for passive logging. Default is `NoopEventSink`.
+    #[must_use]
+    pub fn with_event_sink(mut self, sink: Box<dyn EventSink>) -> Self {
+        self.event_sink = sink;
+        self
     }
 
     #[must_use]
@@ -172,9 +182,21 @@ where
         user_input: impl Into<String>,
         mut prompter: Option<&mut dyn PermissionPrompter>,
     ) -> Result<TurnSummary, RuntimeError> {
+        let user_text = user_input.into();
         self.session
             .messages
-            .push(ConversationMessage::user_text(user_input.into()));
+            .push(ConversationMessage::user_text(user_text.clone()));
+
+        // Emit user prompt event
+        let is_slash = user_text.trim_start().starts_with('/');
+        self.event_sink.emit(&RuntimeEvent {
+            timestamp: now_iso8601(),
+            session_id: String::new(),
+            event_type: EventType::UserPrompt {
+                preview: user_text,
+                is_slash_command: is_slash,
+            },
+        });
 
         let mut assistant_messages = Vec::new();
         let mut tool_results = Vec::new();
@@ -253,6 +275,36 @@ where
                                 output,
                                 post_hook_result.is_denied(),
                             );
+
+                            // Emit tool call event
+                            if tool_name == "Skill" {
+                                // Parse skill name from input JSON for dedicated event
+                                let skill_name = serde_json::from_str::<serde_json::Value>(&input)
+                                    .ok()
+                                    .and_then(|v| v.get("skill").and_then(|s| s.as_str().map(String::from)))
+                                    .unwrap_or_default();
+                                let skill_args = serde_json::from_str::<serde_json::Value>(&input)
+                                    .ok()
+                                    .and_then(|v| v.get("args").and_then(|s| s.as_str().map(String::from)))
+                                    .unwrap_or_default();
+                                self.event_sink.emit(&RuntimeEvent {
+                                    timestamp: now_iso8601(),
+                                    session_id: String::new(),
+                                    event_type: EventType::SkillInvoke {
+                                        skill_name,
+                                        args: skill_args,
+                                    },
+                                });
+                            }
+                            self.event_sink.emit(&RuntimeEvent {
+                                timestamp: now_iso8601(),
+                                session_id: String::new(),
+                                event_type: EventType::ToolCall {
+                                    tool_name: tool_name.clone(),
+                                    input_summary: input.chars().take(200).collect(),
+                                    is_error,
+                                },
+                            });
 
                             ConversationMessage::tool_result(
                                 tool_use_id,

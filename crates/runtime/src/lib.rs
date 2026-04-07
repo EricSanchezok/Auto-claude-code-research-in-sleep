@@ -6,6 +6,7 @@ mod bootstrap;
 mod compact;
 mod config;
 mod conversation;
+pub mod event_sink;
 mod file_ops;
 mod hooks;
 mod json;
@@ -41,6 +42,10 @@ pub use file_ops::{
     edit_file, glob_search, grep_search, read_file, write_file, EditFileOutput, GlobSearchOutput,
     GrepSearchInput, GrepSearchOutput, ReadFileOutput, StructuredPatchHunk, TextFilePayload,
     WriteFileOutput,
+};
+pub use event_sink::{
+    EventSink, EventType, JsonlEventSink, MetaLoggingLevel, NoopEventSink, RuntimeEvent,
+    now_iso8601,
 };
 pub use hooks::{HookEvent, HookRunResult, HookRunner};
 pub use mcp::{
