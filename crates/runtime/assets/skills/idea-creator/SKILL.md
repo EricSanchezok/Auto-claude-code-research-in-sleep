@@ -2,7 +2,7 @@
 name: idea-creator
 description: Generate and rank research ideas given a broad direction. Use when user says "找idea", "brainstorm ideas", "generate research ideas", "what can we work on", or wants to explore a research area for publishable directions.
 argument-hint: [research-direction]
-allowed-tools: Bash(*), Read, Write, Grep, Glob, WebSearch, WebFetch, Agent, mcp__codex__codex, mcp__codex__codex-reply
+allowed-tools: Bash(*), Read, Write, Grep, Glob, WebSearch, WebFetch, Agent, LlmReview
 ---
 
 # Research Idea Creator
@@ -24,6 +24,22 @@ Given a broad research direction from the user, systematically generate, validat
 > 💡 Override via argument, e.g., `/idea-creator "topic" — pilot budget: 4h per idea, 20h total`.
 
 ## Workflow
+
+### Phase 0: Load Research Wiki (if active)
+
+**Skip this phase entirely if `research-wiki/` does not exist.**
+
+```
+if research-wiki/query_pack.md exists AND is less than 7 days old:
+    Read query_pack.md and use it as initial landscape context:
+    - Treat listed gaps as priority search seeds
+    - Treat failed ideas as a banlist (do NOT regenerate similar ideas)
+    - Treat top papers as known prior work (do not re-search them)
+    Still run Phase 1 below for papers from the last 3-6 months (wiki may be stale)
+else if research-wiki/ exists but query_pack.md is stale or missing:
+    python3 research-wiki/research_wiki.py rebuild_query_pack research-wiki/
+    Then read query_pack.md as above
+```
 
 ### Phase 1: Landscape Survey (5-10 min)
 
@@ -52,12 +68,10 @@ Map the research area to understand what exists and where the gaps are.
 
 ### Phase 2: Idea Generation (brainstorm with external LLM)
 
-Use the external LLM via Codex MCP for divergent thinking:
+Use the external reviewer LLM (via LlmReview tool) for divergent thinking:
 
 ```
-mcp__codex__codex:
-  model: REVIEWER_MODEL
-  config: {"model_reasoning_effort": "xhigh"}
+LlmReview:
   prompt: |
     You are a senior ML researcher brainstorming research ideas.
 
@@ -86,7 +100,7 @@ mcp__codex__codex:
     Be creative but grounded. A great idea is one where the answer matters regardless of which way it goes.
 ```
 
-Save the threadId for follow-up.
+Save the review output for follow-up.
 
 ### Phase 3: First-Pass Filtering
 
@@ -112,7 +126,7 @@ For each surviving idea, run a deeper evaluation:
 
 1. **Novelty check**: Use the `/novelty-check` workflow (multi-source search + GPT-5.4 cross-verification) for each idea
 
-2. **Critical review**: Use GPT-5.4 via `mcp__codex__codex-reply` (same thread):
+2. **Critical review**: Use `LlmReview` for adversarial critique:
    ```
    Here are our top ideas after filtering:
    [paste surviving ideas with novelty check results]
@@ -207,6 +221,34 @@ Write a structured report to `IDEA_REPORT.md` in the project root:
 ## Next Steps
 - [ ] Scale up Idea 1 to full experiment (multi-seed, full dataset)
 - [ ] If confirmed, invoke /auto-review-loop for full iteration
+```
+
+## Phase 7: Write Ideas to Research Wiki (if active)
+
+**Skip this phase entirely if `research-wiki/` does not exist.**
+
+This is critical for spiral learning — without it, `ideas/` stays empty and re-ideation has no memory.
+
+```
+if research-wiki/ exists:
+    for each idea in recommended_ideas + eliminated_ideas:
+        1. Create page: research-wiki/ideas/<idea_id>.md
+           - node_id: idea:<id>
+           - stage: proposed (or: piloted, archived)
+           - outcome: unknown (or: negative, mixed, positive)
+           - based_on: [paper:<slug>, ...]
+           - target_gaps: [gap:<id>, ...]
+           - Include: hypothesis, proposed method, expected outcome
+           - If pilot was run: actual outcome, failure notes, reusable components
+
+        2. Add edges:
+           python3 research-wiki/research_wiki.py add_edge research-wiki/ --from "idea:<id>" --to "paper:<slug>" --type inspired_by --evidence "..."
+           python3 research-wiki/research_wiki.py add_edge research-wiki/ --from "idea:<id>" --to "gap:<id>" --type addresses_gap --evidence "..."
+
+    Rebuild query pack:
+        python3 research-wiki/research_wiki.py rebuild_query_pack research-wiki/
+    Log:
+        python3 research-wiki/research_wiki.py log research-wiki/ "idea-creator wrote N ideas (M recommended, K eliminated)"
 ```
 
 ## Key Rules

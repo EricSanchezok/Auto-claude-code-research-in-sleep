@@ -2,7 +2,7 @@
 name: result-to-claim
 description: Use when experiments complete to judge what claims the results support, what they don't, and what evidence is still missing. Codex MCP evaluates results against intended claims and routes to next action (pivot, supplement, or confirm). Use after experiments finish — before writing the paper or running ablations.
 argument-hint: [experiment-description-or-wandb-run]
-allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, mcp__codex__codex, mcp__codex__codex-reply
+allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, LlmReview
 ---
 
 # Result-to-Claim Gate
@@ -37,11 +37,10 @@ Assemble the key information:
 
 ### Step 2: Codex Judgment
 
-Send the collected results to Codex for objective evaluation:
+Send the collected results to the external reviewer (via LlmReview) for objective evaluation:
 
 ```
-mcp__codex__codex:
-  config: {"model_reasoning_effort": "xhigh"}
+LlmReview:
   prompt: |
     RESULT-TO-CLAIM EVALUATION
 
@@ -111,6 +110,46 @@ Extract structured fields from Codex response:
 1. Record confirmed claim in project notes
 2. If ablation studies are incomplete → trigger `/ablation-planner`
 3. If all evidence is in → ready for paper writing
+
+### Step 5: Update Research Wiki (if active)
+
+**Skip this step entirely if `research-wiki/` does not exist.**
+
+```
+if research-wiki/ exists:
+    # 1. Create experiment page
+    Create research-wiki/experiments/<exp_id>.md with:
+      - node_id: exp:<id>
+      - idea_id: idea:<active_idea>
+      - date, hardware, duration, metrics
+      - verdict, confidence, reasoning summary
+
+    # 2. Update claim status
+    for each claim resolved by this verdict:
+        if verdict == "yes":
+            Update claim page: status → supported
+            python3 research-wiki/research_wiki.py add_edge research-wiki/ --from "exp:<id>" --to "claim:<cid>" --type supports --evidence "<metric>"
+        elif verdict == "partial":
+            Update claim page: status → partial
+            python3 research-wiki/research_wiki.py add_edge research-wiki/ --from "exp:<id>" --to "claim:<cid>" --type supports --evidence "partial"
+        else:
+            Update claim page: status → invalidated
+            python3 research-wiki/research_wiki.py add_edge research-wiki/ --from "exp:<id>" --to "claim:<cid>" --type invalidates --evidence "<why>"
+
+    # 3. Update idea outcome
+    Update research-wiki/ideas/<idea_id>.md:
+      - outcome: positive | mixed | negative
+      - If negative: fill "Failure / Risk Notes" and "Lessons Learned"
+      - If positive: fill "Actual Outcome" and "Reusable Components"
+
+    # 4. Rebuild + log
+    python3 research-wiki/research_wiki.py rebuild_query_pack research-wiki/
+    python3 research-wiki/research_wiki.py log research-wiki/ "result-to-claim: exp:<id> verdict=<verdict> for idea:<idea_id>"
+
+    # 5. Re-ideation suggestion
+    Count failed/partial ideas since last /idea-creator run.
+    If >= 3: print "💡 3+ ideas tested since last ideation. Consider re-running /idea-creator — the wiki now knows what doesn't work."
+```
 
 ## Rules
 
