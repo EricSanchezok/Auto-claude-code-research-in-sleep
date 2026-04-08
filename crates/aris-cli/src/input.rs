@@ -602,11 +602,12 @@ fn buf_display_width(buf: &[char], pos: usize) -> usize {
 }
 
 fn clip(s: &str, max: usize) -> String {
-    if s.len() > max {
-        format!("{}…", &s[..max.saturating_sub(1)])
-    } else {
-        s.to_string()
+    if s.len() <= max {
+        return s.to_string();
     }
+    // Truncate by chars, not bytes, to avoid splitting multi-byte UTF-8
+    let truncated: String = s.chars().take(max.saturating_sub(1)).collect();
+    format!("{truncated}…")
 }
 
 #[cfg(test)]

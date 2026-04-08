@@ -1,5 +1,9 @@
 # ARIS-Code Changelog
 
+## v0.3.6 (2026-04-08)
+
+- **Fix**: Tab completion crash when skill descriptions contain CJK characters (Chinese/Japanese/Korean). The `clip()` function was slicing bytes instead of chars, causing a panic on multi-byte UTF-8 boundaries. Fixes #124.
+
 ## v0.3.5 (2026-04-08)
 
 - **New**: **Research Wiki** — persistent research knowledge base with papers, ideas, experiments, claims, and typed relationship graph. Python helper with auto-fallback to direct LLM execution.
