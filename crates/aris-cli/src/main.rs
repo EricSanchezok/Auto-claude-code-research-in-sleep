@@ -1569,17 +1569,20 @@ impl LiveCli {
         }
 
         let previous = self.model.clone();
+        // Rebuild system prompt with new model identity
+        let new_system_prompt = build_system_prompt(Some(&model))?;
         let session = self.runtime.session().clone();
         let message_count = session.messages.len();
         self.runtime = build_runtime(
             session,
             model.clone(),
-            self.system_prompt.clone(),
+            new_system_prompt.clone(),
             true,
             true,
             self.allowed_tools.clone(),
             self.permission_mode,
         )?;
+        self.system_prompt = new_system_prompt;
         self.model.clone_from(&model);
         println!(
             "{}",
@@ -1697,16 +1700,19 @@ impl LiveCli {
             let new_model = resolve_model_alias(new_model).to_string();
             if new_model != self.model {
                 let previous = self.model.clone();
+                // Rebuild system prompt with new model identity
+                let new_system_prompt = build_system_prompt(Some(&new_model))?;
                 let session = self.runtime.session().clone();
                 self.runtime = build_runtime(
                     session,
                     new_model.clone(),
-                    self.system_prompt.clone(),
+                    new_system_prompt.clone(),
                     true,
                     true,
                     self.allowed_tools.clone(),
                     self.permission_mode,
                 )?;
+                self.system_prompt = new_system_prompt;
                 self.model.clone_from(&new_model);
                 println!("  Executor model: {previous} → \x1b[1;32m{new_model}\x1b[0m");
             }

@@ -1,5 +1,9 @@
 # ARIS-Code Changelog
 
+## v0.3.8 (2026-04-09)
+
+- **Fix**: `/setup` and `/model` now rebuild system prompt with new model identity. Previously the model would still identify as the old model (e.g., "I am Claude" after switching to GPT).
+
 ## v0.3.7 (2026-04-09)
 
 - **Fix**: `/setup` provider switch now clears stale env vars. Switching from OpenAI to Anthropic no longer sends Claude model names to the OpenAI endpoint (404 error).
