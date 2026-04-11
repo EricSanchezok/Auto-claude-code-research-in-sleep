@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 
 /// Directory for meta-optimize proposals.
 fn proposals_dir() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+    let home = runtime::home_dir();
     PathBuf::from(home)
         .join(".config")
         .join("aris")
@@ -26,7 +26,7 @@ fn proposals_dir() -> PathBuf {
 
 /// Directory for meta-optimize backups.
 fn backups_dir() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+    let home = runtime::home_dir();
     PathBuf::from(home)
         .join(".config")
         .join("aris")
@@ -36,7 +36,7 @@ fn backups_dir() -> PathBuf {
 
 /// Directory for user skills (highest priority).
 fn user_skills_dir() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+    let home = runtime::home_dir();
     PathBuf::from(home)
         .join(".config")
         .join("aris")
@@ -45,7 +45,7 @@ fn user_skills_dir() -> PathBuf {
 
 /// Optimizations log file.
 fn optimizations_log_path() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+    let home = runtime::home_dir();
     PathBuf::from(home)
         .join(".config")
         .join("aris")
@@ -209,6 +209,10 @@ pub fn apply_proposal(id: usize) -> Result<String, String> {
         let _ = fs::remove_file(&tmp_path);
     }
     fs::write(&tmp_path, &proposal.new_content).map_err(|e| e.to_string())?;
+    // On Windows, rename fails if target exists — remove first
+    if target_path.exists() {
+        let _ = fs::remove_file(&target_path);
+    }
     fs::rename(&tmp_path, &target_path).map_err(|e| e.to_string())?;
 
     // Log the change

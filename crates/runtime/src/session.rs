@@ -108,8 +108,12 @@ impl Session {
         }
 
         // Atomic write: temp file + rename
+        // On Windows, rename fails if target exists — remove first
         let tmp_path = path.with_extension("json.tmp");
         fs::write(&tmp_path, &data)?;
+        if path.exists() {
+            let _ = fs::remove_file(path);
+        }
         fs::rename(&tmp_path, path)?;
         Ok(())
     }

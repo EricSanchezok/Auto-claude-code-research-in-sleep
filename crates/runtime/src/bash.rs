@@ -202,6 +202,12 @@ fn prepare_command(
         return prepared;
     }
 
+    if cfg!(windows) {
+        let mut prepared = Command::new("cmd");
+        prepared.arg("/C").arg(command).current_dir(cwd);
+        return prepared;
+    }
+
     let mut prepared = Command::new("sh");
     prepared.arg("-lc").arg(command).current_dir(cwd);
     if sandbox_status.filesystem_active {
@@ -226,6 +232,12 @@ fn prepare_tokio_command(
         prepared.args(launcher.args);
         prepared.current_dir(cwd);
         prepared.envs(launcher.env);
+        return prepared;
+    }
+
+    if cfg!(windows) {
+        let mut prepared = TokioCommand::new("cmd");
+        prepared.arg("/C").arg(command).current_dir(cwd);
         return prepared;
     }
 

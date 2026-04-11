@@ -1371,14 +1371,11 @@ fn skill_search_roots() -> Vec<std::path::PathBuf> {
     let mut roots = Vec::new();
 
     // 1. ~/.config/aris/skills/ (ARIS user-level, highest priority)
-    if let Ok(home) = std::env::var("HOME") {
-        roots.push(std::path::PathBuf::from(&home).join(".config").join("aris").join("skills"));
-    }
+    let home = runtime::home_dir();
+    roots.push(std::path::PathBuf::from(&home).join(".config").join("aris").join("skills"));
 
     // 2. ~/.claude/skills/ (Claude Code compat, user-level)
-    if let Ok(home) = std::env::var("HOME") {
-        roots.push(std::path::PathBuf::from(&home).join(".claude").join("skills"));
-    }
+    roots.push(std::path::PathBuf::from(&home).join(".claude").join("skills"));
 
     // 3. Project-level .claude/skills/
     if let Ok(cwd) = std::env::current_dir() {
@@ -2853,7 +2850,7 @@ fn config_home_dir() -> Result<PathBuf, String> {
     if let Ok(path) = std::env::var("CLAUDE_CONFIG_HOME") {
         return Ok(PathBuf::from(path));
     }
-    let home = std::env::var("HOME").map_err(|_| String::from("HOME is not set"))?;
+    let home = Ok::<String, String>(runtime::home_dir())?;
     Ok(PathBuf::from(home).join(".claude"))
 }
 

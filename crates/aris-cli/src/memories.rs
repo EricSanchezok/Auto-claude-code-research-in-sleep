@@ -16,7 +16,7 @@ pub struct MemoryEntry {
 
 /// Directory for multi-file memories.
 pub fn memories_dir() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+    let home = runtime::home_dir();
     PathBuf::from(home)
         .join(".config")
         .join("aris")
@@ -117,7 +117,7 @@ fn sanitize_field(s: &str, max_len: usize) -> String {
 
 /// Migrate old single-file memory.md to multi-file format.
 pub fn migrate_legacy_memory() {
-    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+    let home = runtime::home_dir();
     let legacy_path = PathBuf::from(&home)
         .join(".config")
         .join("aris")

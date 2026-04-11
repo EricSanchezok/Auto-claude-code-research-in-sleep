@@ -98,6 +98,14 @@ pub fn bundled_resource(key: &str) -> Option<&'static str> {
         .map(|(_, content)| *content)
 }
 
+/// Cross-platform home directory. Uses HOME on Unix, USERPROFILE on Windows.
+#[must_use]
+pub fn home_dir() -> String {
+    std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .unwrap_or_else(|_| ".".into())
+}
+
 #[cfg(test)]
 pub(crate) fn test_env_lock() -> std::sync::MutexGuard<'static, ()> {
     static LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();

@@ -3021,7 +3021,7 @@ fn build_system_prompt(model_id: Option<&str>) -> Result<Vec<String>, Box<dyn st
 }
 
 fn aris_tasks_path() -> PathBuf {
-    let home = env::var("HOME").unwrap_or_else(|_| ".".into());
+    let home = runtime::home_dir();
     PathBuf::from(home)
         .join(".config")
         .join("aris")
@@ -4098,7 +4098,7 @@ fn check_auth_status() -> &'static str {
     if env::var("ANTHROPIC_AUTH_TOKEN").map_or(false, |v| !v.is_empty()) {
         return "OK (bearer token)";
     }
-    let home = env::var("HOME").unwrap_or_default();
+    let home = runtime::home_dir();
     let creds_path = PathBuf::from(&home).join(".claude").join("credentials.json");
     if creds_path.exists() {
         return "OK (OAuth saved)";
@@ -4169,7 +4169,7 @@ fn run_setup() -> Result<(), Box<dyn std::error::Error>> {
 /// Add Codex MCP server entry to ~/.claude.json if not already present.
 /// Returns Ok(true) if added, Ok(false) if already exists.
 fn configure_codex_mcp(codex_path: &Path) -> Result<bool, Box<dyn std::error::Error>> {
-    let home = env::var("HOME")?;
+    let home = Ok::<String, std::env::VarError>(runtime::home_dir())?;
     let config_path = PathBuf::from(&home).join(".claude.json");
 
     // Read existing config or start fresh
@@ -4278,7 +4278,7 @@ fn run_doctor() -> Result<(), Box<dyn std::error::Error>> {
 
     // Check 4: Codex MCP in config
     print!("  Codex MCP:    ");
-    let home = env::var("HOME").unwrap_or_default();
+    let home = runtime::home_dir();
     let config_path = PathBuf::from(&home).join(".claude.json");
     if config_path.exists() {
         if let Ok(content) = fs::read_to_string(&config_path) {
@@ -4312,13 +4312,13 @@ fn run_doctor() -> Result<(), Box<dyn std::error::Error>> {
 
 /// ARIS-specific skills directory (highest priority).
 fn dirs_aris_skills() -> PathBuf {
-    let home = env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    let home = runtime::home_dir();
     PathBuf::from(home).join(".config").join("aris").join("skills")
 }
 
 /// Claude Code user skills directory.
 fn dirs_claude_skills() -> PathBuf {
-    let home = env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    let home = runtime::home_dir();
     PathBuf::from(home).join(".claude").join("skills")
 }
 

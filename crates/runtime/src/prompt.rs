@@ -503,14 +503,11 @@ fn render_available_skills() -> Option<String> {
 
 fn skill_search_roots() -> Vec<PathBuf> {
     let mut roots = Vec::new();
+    let home = crate::home_dir();
     // ARIS user skills (highest priority)
-    if let Ok(home) = std::env::var("HOME") {
-        roots.push(PathBuf::from(&home).join(".config").join("aris").join("skills"));
-    }
+    roots.push(PathBuf::from(&home).join(".config").join("aris").join("skills"));
     // Claude Code user skills
-    if let Ok(home) = std::env::var("HOME") {
-        roots.push(PathBuf::from(&home).join(".claude").join("skills"));
-    }
+    roots.push(PathBuf::from(&home).join(".claude").join("skills"));
     // Project-level skills
     if let Ok(cwd) = std::env::current_dir() {
         roots.push(cwd.join(".claude").join("skills"));

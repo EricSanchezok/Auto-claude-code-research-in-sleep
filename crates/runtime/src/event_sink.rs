@@ -107,7 +107,7 @@ impl JsonlEventSink {
     /// Default path: `~/.config/aris/meta/events.jsonl`
     #[must_use]
     pub fn default_path() -> PathBuf {
-        let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+        let home = crate::home_dir();
         PathBuf::from(home)
             .join(".config")
             .join("aris")

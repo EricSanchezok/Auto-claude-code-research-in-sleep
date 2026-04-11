@@ -42,7 +42,7 @@ pub struct ArisConfig {
 
 impl ArisConfig {
     fn config_path() -> PathBuf {
-        let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+        let home = runtime::home_dir();
         PathBuf::from(home).join(CONFIG_DIR).join(CONFIG_FILE)
     }
 
@@ -88,6 +88,14 @@ impl ArisConfig {
             std::env::remove_var("ANTHROPIC_API_KEY");
             std::env::remove_var("ANTHROPIC_AUTH_TOKEN");
             std::env::remove_var("ANTHROPIC_BASE_URL");
+            // Clear ALL reviewer-related env vars
+            std::env::remove_var("OPENAI_API_KEY");
+            std::env::remove_var("GEMINI_API_KEY");
+            std::env::remove_var("GLM_API_KEY");
+            std::env::remove_var("MINIMAX_API_KEY");
+            std::env::remove_var("KIMI_API_KEY");
+            std::env::remove_var("ARIS_REVIEWER_MODEL");
+            std::env::remove_var("ARIS_REVIEWER_BASE_URL");
         }
 
         if let Some(provider) = &self.executor_provider {
@@ -357,6 +365,7 @@ pub fn run_interactive_setup() -> io::Result<ArisConfig> {
         config.reviewer_provider = None;
         config.reviewer_api_key = None;
         config.reviewer_base_url = None;
+        config.reviewer_model = None;
     }
 
     // ── Step 5: Language ──

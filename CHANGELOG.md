@@ -1,5 +1,10 @@
 # ARIS-Code Changelog
 
+## v0.3.10 (2026-04-11)
+
+- **Fix**: **Windows compatibility overhaul** — all path resolution now uses `USERPROFILE` fallback (previously only checked `HOME` which doesn't exist on Windows, causing crashes). Bash tool uses `cmd /C` on Windows. `fs::rename` handles existing target files.
+- **Fix**: `/setup` "Skip reviewer" now properly clears `reviewer_model`. Force setup clears all reviewer env vars to prevent stale state.
+
 ## v0.3.9 (2026-04-11)
 
 - **New**: **Proxy / custom base URL support** — `/setup` now asks for proxy base URL for ALL providers (Executor + Reviewer). Supports API proxy services (CCSwitch, CCVibe, etc.) and local models (LM Studio, Ollama). Leave blank for default — zero behavior change for existing users.
