@@ -26,13 +26,11 @@
 
 ## 📰 最新动态
 
-> **v0.3.9** (2026-04-11) — 代理/自定义 base URL 支持 | 本地模型支持 (LM Studio / Ollama) | 模型切换修复 | Bug fixes
->
-> **v0.3.5** (2026-04-08) — Research Wiki 持久知识库 | 自进化 Meta-Optimize | Session 原子写入 | Bash 安全校验 | Windows 支持 (experimental)
+> **v0.3.9** (2026-04-11) — 代理/自定义 base URL | 本地模型 (LM Studio/Ollama) | Research Wiki | 自进化 Meta-Optimize | Session 原子写入 | Bash 安全校验 | Windows (experimental)
 >
 > <details><summary>历史版本</summary>
 >
-> **v0.3.4** (2026-04-08) — Workflow M: 自进化 Meta-Optimize | Session 原子写入 | Bash 安全校验 | Windows 支持 (experimental)
+> **v0.3.5** (2026-04-08) — Research Wiki | 自进化 Meta-Optimize | Session 原子写入 | Bash 安全校验 | Windows 支持
 >
 > **v0.3.3** (2026-04-04) — 修复所有 Claude Code hooks 配置崩溃路径
 >
