@@ -69,7 +69,7 @@ Recommended: Idea 1. Shall I proceed with implementation?
 
 Once the user confirms which idea to pursue:
 
-1. **Read the idea details** from `idea-stage/IDEA_REPORT.md` (hypothesis, experimental design, pilot code)
+1. **Read the idea details** from `idea-stage/IDEA_REPORT.md` (hypothesis, experimental design, pilot code) *(fall back to `./IDEA_REPORT.md` if not found)*
 
 2. **Implement the full experiment**:
    - Extend pilot code to full scale (multi-seed, full dataset, proper baselines)

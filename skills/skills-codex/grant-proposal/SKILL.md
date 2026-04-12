@@ -161,10 +161,10 @@ Parse `$ARGUMENTS` to extract:
 
 Then gather context from the project directory:
 
-1. Read `idea-stage/IDEA_REPORT.md` if it exists (from `/idea-discovery`)
+1. Read `idea-stage/IDEA_REPORT.md` if it exists (from `/idea-discovery`); fall back to `./IDEA_REPORT.md` if not found
 2. Read `refine-logs/FINAL_PROPOSAL.md` if it exists (from `/research-refine`)
 3. Read `refine-logs/EXPERIMENT_PLAN.md` if it exists (from `/experiment-plan`)
-4. Read `review-stage/AUTO_REVIEW.md` if it exists (from `/auto-review-loop` — prior review feedback is gold for grants)
+4. Read `review-stage/AUTO_REVIEW.md` if it exists (from `/auto-review-loop` — prior review feedback is gold for grants); fall back to `./AUTO_REVIEW.md` if not found
 5. Read `NARRATIVE_REPORT.md` or `STORY.md` if they exist
 6. Read any existing literature notes or survey documents
 7. Scan for the user's publication list (e.g., `publications.md`, `cv.md`, `bio.md`, `CV.pdf`)

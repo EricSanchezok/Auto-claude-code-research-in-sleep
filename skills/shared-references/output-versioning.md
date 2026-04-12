@@ -67,6 +67,40 @@ Files that get overwritten on re-runs:
 
 Never delete timestamped files. They are the permanent history.
 
+## Path Fallback Rule (Backward Compatibility)
+
+Skills that **read** stage-scoped files must fall back to the old root-level location for projects created before this layout was introduced:
+
+```
+# For idea-stage files:
+Read from idea-stage/IDEA_REPORT.md
+If not found → fall back to ./IDEA_REPORT.md
+
+Read from idea-stage/IDEA_CANDIDATES.md
+If not found → fall back to ./IDEA_CANDIDATES.md
+
+# For review-stage files:
+Read from review-stage/AUTO_REVIEW.md
+If not found → fall back to ./AUTO_REVIEW.md
+
+Read from review-stage/REVIEW_STATE.json
+If not found → fall back to ./REVIEW_STATE.json
+```
+
+Skills that **write** always use the stage-scoped path (never write to root). This ensures new runs migrate output forward while old projects continue to work.
+
+## Migration for Existing Projects
+
+If you find root-level files (`IDEA_REPORT.md`, `AUTO_REVIEW.md`, etc.) and the stage directories do not yet exist, you may optionally offer to migrate:
+
+```
+📁 Found legacy root-level files. Migrate to stage directories?
+  mv IDEA_REPORT.md idea-stage/IDEA_REPORT.md
+  mv AUTO_REVIEW.md review-stage/AUTO_REVIEW.md
+  (etc.)
+Only do this if the user confirms — do not auto-migrate silently.
+```
+
 ## Stale State Detection
 
 Before reading a state file (`REFINE_STATE.json`, `REVIEW_STATE.json`, `DSE_STATE.json`):

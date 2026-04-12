@@ -21,6 +21,11 @@ Determine the output language using this priority:
 - Technical terms with no standard Chinese translation (keep English, optionally annotate: "attention mechanism (注意力机制)")
 - LaTeX content — paper-writing workflow always outputs English for venue submission
 - JSON state files — keys and structure remain English
+- **Machine-parsed markers** — never localize the following, regardless of language setting:
+  - Markdown frontmatter keys (e.g., `outcome:`, `node_id:`, `title:`, `type:`)
+  - Research Wiki schema fields parsed by `tools/research_wiki.py` (e.g., `outcome: negative`, `outcome: positive`, `node_id:`)
+  - `MANIFEST.md` column headers and table structure
+  - Any field that downstream tools or scripts read programmatically
 
 ## Skill-Specific Rules
 
