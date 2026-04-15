@@ -96,6 +96,8 @@ impl ArisConfig {
             std::env::remove_var("KIMI_API_KEY");
             std::env::remove_var("ARIS_REVIEWER_MODEL");
             std::env::remove_var("ARIS_REVIEWER_BASE_URL");
+            std::env::remove_var("ARIS_REVIEWER_PROVIDER");
+            std::env::remove_var("ARIS_REVIEWER_AUTH_TOKEN");
         }
 
         if let Some(provider) = &self.executor_provider {

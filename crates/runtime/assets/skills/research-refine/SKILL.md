@@ -1,7 +1,7 @@
 ---
 name: research-refine
 description: 'Turn a vague research direction into a problem-anchored, elegant, frontier-aware, implementation-oriented method plan via iterative GPT-5.4 review. Use when the user says "refine my approach", "帮我细化方案", "decompose this problem", "打磨idea", "refine research plan", "细化研究方案", or wants a concrete research method that stays simple, focused, and top-venue ready instead of a vague or overbuilt idea.'
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Agent, LlmReview
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Agent, mcp__codex__codex, mcp__codex__codex-reply
 ---
 
 # Research Refine: Problem-Anchored, Elegant, Frontier-Aware Plan Refinement
@@ -318,7 +318,7 @@ Use this structure:
 Send the full proposal to GPT-5.4 for an **elegance-first, frontier-aware, method-first** review. The reviewer should spend most of the critique budget on the method itself, not on expanding the experiment menu.
 
 ```
-LlmReview:
+mcp__codex__codex:
   model: REVIEWER_MODEL
   config: {"model_reasoning_effort": "xhigh"}
   prompt: |
@@ -497,7 +497,7 @@ Save to `refine-logs/round-N-refinement.md`:
 Send the revised proposal back to GPT-5.4 in the **same thread**:
 
 ```
-:
+mcp__codex__codex-reply:
   threadId: [saved from Phase 2]
   model: REVIEWER_MODEL
   config: {"model_reasoning_effort": "xhigh"}
@@ -692,6 +692,13 @@ Suggested next step: /experiment-plan
 
 **Checkpoint:** Update `refine-logs/REFINE_STATE.json` with `{"phase": "done", "status": "completed", ...}`.
 
+## Output Protocols
+
+> Follow these shared protocols for all output files:
+> - **[Output Versioning Protocol](shared-references/output-versioning.md)** — write timestamped file first, then copy to fixed name
+> - **[Output Manifest Protocol](shared-references/output-manifest.md)** — log every output to MANIFEST.md
+> - **[Output Language Protocol](shared-references/output-language.md)** — respect the project's language setting
+
 ## Key Rules
 
 - **Large file handling**: If the Write tool fails due to file size, immediately retry using Bash (`cat << 'EOF' > file`) to write in chunks. Do NOT ask the user for permission — just do it silently.
@@ -705,7 +712,7 @@ Suggested next step: /experiment-plan
 - **Review the mechanism, not the parts count.** A long module list is not novelty.
 - **Pushback is encouraged.** If reviewer feedback causes drift or unnecessary complexity, argue back with evidence.
 - **ALWAYS use `config: {"model_reasoning_effort": "xhigh"}`** for all Codex review calls.
-- **Save `threadId` from Phase 2** and use `` for later rounds.
+- **Save `threadId` from Phase 2** and use `mcp__codex__codex-reply` for later rounds.
 - **Do not fabricate results.** Only describe expected evidence and planned experiments.
 - **Be specific about compute and data assumptions.** Vague "we'll train a model" is not enough.
 - **Document everything.** Save every raw review, every anchor check, every simplicity check, and every major method change.

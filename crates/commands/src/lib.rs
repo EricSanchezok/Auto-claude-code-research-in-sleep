@@ -77,8 +77,8 @@ const SLASH_COMMAND_SPECS: &[SlashCommandSpec] = &[
     },
     SlashCommandSpec {
         name: "plan",
-        summary: "Create a step-by-step plan before executing",
-        argument_hint: Some("<task>"),
+        summary: "Enter read-only plan mode (plan execute|plan exit)",
+        argument_hint: Some("<task>|execute|exit"),
         resume_supported: false,
     },
     SlashCommandSpec {

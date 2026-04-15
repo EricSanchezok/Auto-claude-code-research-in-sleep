@@ -1330,6 +1330,19 @@ fn execute_skill(input: SkillInput) -> Result<SkillOutput, String> {
 /// E.g., for skill "research-wiki", extracts "research-wiki/research_wiki.py" to
 /// `<cwd>/research-wiki/research_wiki.py`.
 fn extract_bundled_helpers(skill_name: &str) {
+    // Always extract shared-references/ on any skill invocation
+    let shared_prefix = "shared-references/";
+    for (key, content) in runtime::BUNDLED_RESOURCES {
+        if let Some(filename) = key.strip_prefix(shared_prefix) {
+            let target_dir = std::path::PathBuf::from("shared-references");
+            let target_path = target_dir.join(filename);
+            if !target_path.exists() {
+                let _ = std::fs::create_dir_all(&target_dir);
+                let _ = std::fs::write(&target_path, content);
+            }
+        }
+    }
+    // Extract skill-specific helpers
     let prefix = format!("{skill_name}/");
     for (key, content) in runtime::BUNDLED_RESOURCES {
         if let Some(filename) = key.strip_prefix(&prefix) {
@@ -3215,6 +3228,116 @@ fn run_llm_review(input: LlmReviewInput) -> Result<String, String> {
     call_openai_compat_reviewer(&key, &base_url, model, &input.prompt)
 }
 
+/// Returns true if this reqwest error is a transient network-level failure
+/// worth retrying (connection reset, timeout, DNS hiccup, etc.).
+/// HTTP 4xx/5xx responses are NOT retried here — those come back as Ok(response).
+fn is_transient_network_error(err: &reqwest::Error) -> bool {
+    err.is_timeout() || err.is_connect() || err.is_request() || err.is_body()
+}
+
+/// Build a fresh blocking HTTP client. Each retry attempt gets its own pool
+/// so we never reuse a broken TCP/TLS connection that caused the last failure.
+fn fresh_reviewer_client() -> reqwest::blocking::Client {
+    reqwest::blocking::Client::builder()
+        .pool_max_idle_per_host(0) // no connection pooling between calls
+        .connect_timeout(std::time::Duration::from_secs(15))
+        .timeout(std::time::Duration::from_secs(180))
+        .build()
+        .unwrap_or_else(|_| reqwest::blocking::Client::new())
+}
+
+/// Format a reqwest error with its full source chain so we can see what actually failed
+/// (DNS? TLS? connection reset?) instead of just "error sending request".
+fn describe_reqwest_error(err: &reqwest::Error) -> String {
+    let mut parts: Vec<String> = vec![err.to_string()];
+    let mut src: Option<&(dyn std::error::Error + 'static)> = std::error::Error::source(err);
+    let mut depth = 0;
+    while let Some(s) = src {
+        parts.push(format!("  caused by: {s}"));
+        src = s.source();
+        depth += 1;
+        if depth > 6 {
+            break;
+        }
+    }
+    parts.join("\n")
+}
+
+/// Send a reviewer request with retry on transient network errors AND HTTP 429/5xx.
+/// Up to 4 attempts total, exponential backoff (1s, 2s, 4s). Aborts early on Ctrl+C.
+/// Respects Retry-After header when present.
+fn send_reviewer_request_with_retry(
+    build: impl Fn() -> reqwest::blocking::RequestBuilder,
+) -> Result<reqwest::blocking::Response, String> {
+    const MAX_ATTEMPTS: u32 = 4;
+    let mut last_err: Option<String> = None;
+    for attempt in 1..=MAX_ATTEMPTS {
+        if runtime::is_interrupted() {
+            runtime::clear_interrupt();
+            return Err("LlmReview interrupted by user".to_string());
+        }
+        match build().send() {
+            Ok(resp) => {
+                let status = resp.status();
+                if status.is_success() {
+                    return Ok(resp);
+                }
+                let retryable = status.as_u16() == 429 || status.is_server_error();
+                if !retryable || attempt == MAX_ATTEMPTS {
+                    let body = resp.text().unwrap_or_default();
+                    return Err(format!("LlmReview API error {status}: {body}"));
+                }
+                let retry_after = resp
+                    .headers()
+                    .get("retry-after")
+                    .and_then(|v| v.to_str().ok())
+                    .and_then(|s| s.parse::<u64>().ok());
+                let body = resp.text().unwrap_or_default();
+                let preview: String = body.chars().take(160).collect();
+                let backoff_ms = if let Some(secs) = retry_after {
+                    (secs * 1000).min(10_000)
+                } else {
+                    (1u64 << (attempt - 1)) * 1000
+                };
+                eprintln!(
+                    "\x1b[33m  LlmReview {status} (attempt {attempt}/{MAX_ATTEMPTS}), retrying in {backoff_ms}ms: {preview}\x1b[0m"
+                );
+                let deadline = std::time::Instant::now()
+                    + std::time::Duration::from_millis(backoff_ms);
+                while std::time::Instant::now() < deadline {
+                    if runtime::is_interrupted() {
+                        runtime::clear_interrupt();
+                        return Err("LlmReview interrupted by user".to_string());
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                }
+            }
+            Err(e) => {
+                let transient = is_transient_network_error(&e);
+                let detail = describe_reqwest_error(&e);
+                last_err = Some(format!("LlmReview request failed: {detail}"));
+                if !transient || attempt == MAX_ATTEMPTS {
+                    break;
+                }
+                let backoff_ms: u64 = (1u64 << (attempt - 1)) * 1000;
+                eprintln!(
+                    "\x1b[33m  LlmReview transient error (attempt {attempt}/{MAX_ATTEMPTS}), retrying in {backoff_ms}ms:\n{detail}\x1b[0m"
+                );
+                let deadline = std::time::Instant::now()
+                    + std::time::Duration::from_millis(backoff_ms);
+                while std::time::Instant::now() < deadline {
+                    if runtime::is_interrupted() {
+                        runtime::clear_interrupt();
+                        return Err("LlmReview interrupted by user".to_string());
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                }
+            }
+        }
+    }
+    Err(last_err.unwrap_or_else(|| "LlmReview request failed: unknown".to_string()))
+}
+
 fn call_anthropic_compat_reviewer(
     api_key: &str,
     endpoint: &str,
@@ -3227,15 +3350,15 @@ fn call_anthropic_compat_reviewer(
         "messages": [{"role": "user", "content": prompt}]
     });
 
-    let client = reqwest::blocking::Client::new();
-    let response = client
-        .post(endpoint)
-        .bearer_auth(api_key)
-        .header("anthropic-version", "2023-06-01")
-        .header("content-type", "application/json")
-        .json(&body)
-        .send()
-        .map_err(|e| format!("LlmReview request failed: {e}"))?;
+    // Build a fresh client per request to avoid reusing a broken connection pool.
+    let response = send_reviewer_request_with_retry(|| {
+        fresh_reviewer_client()
+            .post(endpoint)
+            .bearer_auth(api_key)
+            .header("anthropic-version", "2023-06-01")
+            .header("content-type", "application/json")
+            .json(&body)
+    })?;
 
     let json: serde_json::Value = response
         .json()
@@ -3261,13 +3384,10 @@ fn call_openai_compat_reviewer(
         "messages": [{"role": "user", "content": prompt}]
     });
 
-    let client = reqwest::blocking::Client::new();
-    let response = client
-        .post(base_url)
-        .bearer_auth(api_key)
-        .json(&body)
-        .send()
-        .map_err(|e| format!("LlmReview request failed: {e}"))?;
+    // Build a fresh client per request to avoid reusing a broken connection pool.
+    let response = send_reviewer_request_with_retry(|| {
+        fresh_reviewer_client().post(base_url).bearer_auth(api_key).json(&body)
+    })?;
 
     let json: serde_json::Value = response
         .json()

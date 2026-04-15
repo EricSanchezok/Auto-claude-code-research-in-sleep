@@ -106,6 +106,24 @@ pub fn home_dir() -> String {
         .unwrap_or_else(|_| ".".into())
 }
 
+/// Global interrupt flag set by SIGINT handler. Streaming loops check this
+/// between chunks/iterations to allow Ctrl+C to interrupt long operations.
+pub static INTERRUPTED: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+#[must_use]
+pub fn is_interrupted() -> bool {
+    INTERRUPTED.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+pub fn clear_interrupt() {
+    INTERRUPTED.store(false, std::sync::atomic::Ordering::SeqCst);
+}
+
+pub fn set_interrupt() {
+    INTERRUPTED.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
 #[cfg(test)]
 pub(crate) fn test_env_lock() -> std::sync::MutexGuard<'static, ()> {
     static LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();

@@ -1,5 +1,22 @@
 # ARIS-Code Changelog
 
+## v0.4.1 (2026-04-15)
+
+- **New**: **Robust reviewer/executor retries** — transient network errors, HTTP 429 rate limits, and 5xx server errors now auto-retry (up to 4 attempts, exponential backoff, honors `Retry-After`). Ctrl+C interrupts the backoff instantly.
+- **Fix**: **Stale interrupt flag** — after a Ctrl+C mid-tool, subsequent tool calls no longer fail with "interrupted by user" forever. Every interrupt check now consumes the flag.
+- **Fix**: **Broken connection pool on reviewer** — LlmReview builds a fresh HTTP client per attempt with `pool_max_idle_per_host=0`, avoiding reuse of dead TCP/TLS connections. Adds 15s connect timeout + 180s total timeout.
+- **Improved**: Network error messages now include full `caused by:` chain (DNS / TLS / connection reset) so failures are diagnosable instead of opaque "error sending request".
+
+## v0.4.0 (2026-04-15)
+
+- **New**: **Plan mode** — `/plan <task>` enters read-only execution (Read/Grep/Glob/WebSearch only, no Edit/Write/Bash). `/plan execute` switches back to normal permissions. `/plan exit` cancels. Transactional state transitions: if runtime rebuild fails, previous state is preserved. Inspired by claw-code.
+- **New**: **Cooperative Ctrl+C interrupt** — single Ctrl+C aborts the current in-flight operation and returns to REPL instead of killing the process. Works across Anthropic streaming, OpenAI-compatible streaming, conversation loops, and reviewer calls.
+- **Fix**: **API errors no longer exit the REPL** — network failures, 4xx/5xx responses, and malformed responses are caught at the REPL boundary; user can retry or `/model` to switch.
+- **New**: **Tool output folding** — WebSearch / WebFetch / LlmReview / Skill tool results get dedicated compact formats; default truncation tightened from 200 → 120 chars.
+- **Sync**: 62 skills synced from main ARIS branch, plus 16 shared-references bundled as embedded resources. Auto-extracted to cwd on first skill invocation; `../shared-references/` paths rewritten to cwd-relative for bundled skills.
+- **Fix**: **Windows `fs::rename`** — credentials save (oauth.rs) and Codex MCP config write now remove target before rename (Windows doesn't overwrite).
+- **Fix**: **Stale reviewer env vars** — `force_apply_to_env` now clears `ARIS_REVIEWER_PROVIDER` / `ARIS_REVIEWER_AUTH_TOKEN` when switching reviewer config.
+
 ## v0.3.11 (2026-04-13)
 
 - **New**: **Reviewer Anthropic-compatible mode** — LlmReview now supports Anthropic-compatible endpoints as reviewer (e.g., Claude via proxy). Set `ARIS_REVIEWER_PROVIDER=anthropic-compat` or select "Anthropic Proxy" in `/setup`.

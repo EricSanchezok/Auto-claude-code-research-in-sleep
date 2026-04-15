@@ -121,26 +121,99 @@ impl ApiClient for OpenAIRuntimeClient {
         );
 
         self.runtime.block_on(async {
-            let mut response = self
-                .http
-                .post(&url)
-                .bearer_auth(&self.api_key)
-                .header("content-type", "application/json")
-                .json(&body)
-                .send()
-                .await
-                .map_err(|e| RuntimeError::new(format!("OpenAI request failed: {e}")))?;
+            const MAX_ATTEMPTS: u32 = 4;
+            let mut attempt: u32 = 0;
+            let mut response = loop {
+                attempt += 1;
+                if runtime::is_interrupted() {
+                    runtime::clear_interrupt();
+                    return Err(RuntimeError::new("interrupted by user"));
+                }
+                let send_result = self
+                    .http
+                    .post(&url)
+                    .bearer_auth(&self.api_key)
+                    .header("content-type", "application/json")
+                    .json(&body)
+                    .send()
+                    .await;
 
-            if !response.status().is_success() {
-                let status = response.status();
-                let body = response
-                    .text()
-                    .await
-                    .unwrap_or_else(|_| String::new());
-                return Err(RuntimeError::new(format!(
-                    "OpenAI API error {status}: {body}"
-                )));
-            }
+                match send_result {
+                    Ok(resp) => {
+                        let status = resp.status();
+                        // Retry on 429 (rate limit) and 5xx (server errors)
+                        let retryable = status.as_u16() == 429 || status.is_server_error();
+                        if resp.status().is_success() {
+                            break resp;
+                        }
+                        if retryable && attempt < MAX_ATTEMPTS {
+                            let retry_after_secs = resp
+                                .headers()
+                                .get("retry-after")
+                                .and_then(|v| v.to_str().ok())
+                                .and_then(|s| s.parse::<u64>().ok());
+                            let backoff_ms = if let Some(secs) = retry_after_secs {
+                                (secs * 1000).min(10_000)
+                            } else {
+                                (1u64 << (attempt - 1)) * 1000 // 1s, 2s, 4s
+                            };
+                            let body_preview = resp.text().await.unwrap_or_default();
+                            let preview: String = body_preview.chars().take(160).collect();
+                            eprintln!(
+                                "\x1b[33m  OpenAI {status} (attempt {attempt}/{MAX_ATTEMPTS}), retrying in {}ms: {preview}\x1b[0m",
+                                backoff_ms
+                            );
+                            let deadline =
+                                std::time::Instant::now() + std::time::Duration::from_millis(backoff_ms);
+                            while std::time::Instant::now() < deadline {
+                                if runtime::is_interrupted() {
+                                    return Err(RuntimeError::new("interrupted by user"));
+                                }
+                                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                            }
+                            continue;
+                        }
+                        let body = resp.text().await.unwrap_or_else(|_| String::new());
+                        return Err(RuntimeError::new(format!(
+                            "OpenAI API error {status}: {body}"
+                        )));
+                    }
+                    Err(e) => {
+                        let transient = e.is_timeout() || e.is_connect() || e.is_request() || e.is_body();
+                        // Build full error chain for diagnostic visibility
+                        let mut chain = vec![e.to_string()];
+                        let mut src: Option<&(dyn std::error::Error + 'static)> =
+                            std::error::Error::source(&e);
+                        let mut depth = 0;
+                        while let Some(s) = src {
+                            chain.push(format!("  caused by: {s}"));
+                            src = s.source();
+                            depth += 1;
+                            if depth > 6 {
+                                break;
+                            }
+                        }
+                        let detail = chain.join("\n");
+                        if transient && attempt < MAX_ATTEMPTS {
+                            let backoff_ms: u64 = (1u64 << (attempt - 1)) * 1000;
+                            eprintln!(
+                                "\x1b[33m  OpenAI network error (attempt {attempt}/{MAX_ATTEMPTS}), retrying in {backoff_ms}ms:\n{detail}\x1b[0m"
+                            );
+                            let deadline = std::time::Instant::now()
+                                + std::time::Duration::from_millis(backoff_ms);
+                            while std::time::Instant::now() < deadline {
+                                if runtime::is_interrupted() {
+                                    runtime::clear_interrupt();
+                                    return Err(RuntimeError::new("interrupted by user"));
+                                }
+                                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                            }
+                            continue;
+                        }
+                        return Err(RuntimeError::new(format!("OpenAI request failed: {detail}")));
+                    }
+                }
+            };
 
             let mut stdout = io::stdout();
             let mut sink = io::sink();
@@ -164,6 +237,11 @@ impl ApiClient for OpenAIRuntimeClient {
             let mut done = false;
 
             loop {
+                // Check for Ctrl+C interrupt between chunks
+                if runtime::is_interrupted() {
+                    runtime::clear_interrupt();
+                    return Err(RuntimeError::new("interrupted by user"));
+                }
                 let chunk = response
                     .chunk()
                     .await

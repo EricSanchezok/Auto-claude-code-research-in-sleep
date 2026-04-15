@@ -26,9 +26,13 @@
 
 ## 📰 最新动态
 
-> **v0.3.9** (2026-04-11) — 代理/自定义 base URL | 本地模型 (LM Studio/Ollama) | Research Wiki | 自进化 Meta-Optimize | Session 原子写入 | Bash 安全校验 | Windows (experimental)
+> **v0.4.1** (2026-04-15) — Reviewer/Executor 自动重试 (429/5xx/网络抖动) | Ctrl+C 后标志污染修复 | 每次 reviewer 请求新 HTTP client(绕过坏连接池) | 详细错误链
+>
+> **v0.4.0** (2026-04-15) — **Plan 模式** (`/plan`) | Ctrl+C 协作式中断(不再直接退出) | API 错误不再退出 REPL | 工具输出折叠 | 同步 62 个 skills
 >
 > <details><summary>历史版本</summary>
+>
+> **v0.3.9** (2026-04-11) — 代理/自定义 base URL | 本地模型 (LM Studio/Ollama) | Research Wiki | 自进化 Meta-Optimize | Session 原子写入 | Bash 安全校验 | Windows (experimental)
 >
 > **v0.3.5** (2026-04-08) — Research Wiki | 自进化 Meta-Optimize | Session 原子写入 | Bash 安全校验 | Windows 支持
 >

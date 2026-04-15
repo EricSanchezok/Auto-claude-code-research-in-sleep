@@ -2,7 +2,7 @@
 name: novelty-check
 description: Verify research idea novelty against recent literature. Use when user says "查新", "novelty check", "有没有人做过", "check novelty", or wants to verify a research idea is novel before implementing.
 argument-hint: [method-or-idea-description]
-allowed-tools: WebSearch, WebFetch, Grep, Read, Glob, LlmReview
+allowed-tools: WebSearch, WebFetch, Grep, Read, Glob, mcp__codex__codex
 ---
 
 # Novelty Check Skill
@@ -41,7 +41,7 @@ For EACH core claim, search using ALL available sources:
 3. **Read abstracts**: For each potentially overlapping paper, WebFetch its abstract and related work section
 
 ### Phase C: Cross-Model Verification
-Call REVIEWER_MODEL via Codex MCP (`LlmReview`) with xhigh reasoning:
+Call REVIEWER_MODEL via Codex MCP (`mcp__codex__codex`) with xhigh reasoning:
 ```
 config: {"model_reasoning_effort": "xhigh"}
 ```
@@ -84,3 +84,7 @@ Output a structured report:
 - Check both the method AND the experimental setting for novelty
 - If the method is not novel but the FINDING would be, say so explicitly
 - Always check the most recent 6 months of arXiv — the field moves fast
+
+## Review Tracing
+
+After each `mcp__codex__codex` or `mcp__codex__codex-reply` reviewer call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).

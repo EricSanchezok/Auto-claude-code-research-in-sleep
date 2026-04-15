@@ -203,6 +203,11 @@ where
         let mut iterations = 0;
 
         loop {
+            // Check for Ctrl+C interrupt between iterations
+            if crate::is_interrupted() {
+                crate::clear_interrupt();
+                return Err(RuntimeError::new("interrupted by user"));
+            }
             iterations += 1;
             if iterations > self.max_iterations {
                 return Err(RuntimeError::new(

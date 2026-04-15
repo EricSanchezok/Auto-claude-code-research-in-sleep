@@ -2,7 +2,7 @@
 name: idea-creator
 description: Generate and rank research ideas given a broad direction. Use when user says "找idea", "brainstorm ideas", "generate research ideas", "what can we work on", or wants to explore a research area for publishable directions.
 argument-hint: [research-direction]
-allowed-tools: Bash(*), Read, Write, Grep, Glob, WebSearch, WebFetch, Agent, LlmReview
+allowed-tools: Bash(*), Read, Write, Grep, Glob, WebSearch, WebFetch, Agent, mcp__codex__codex, mcp__codex__codex-reply
 ---
 
 # Research Idea Creator
@@ -20,6 +20,8 @@ Given a broad research direction from the user, systematically generate, validat
 - **MAX_PILOT_IDEAS = 3** — Pilot at most 3 ideas in parallel. Additional ideas are validated on paper only.
 - **MAX_TOTAL_GPU_HOURS = 8** — Total GPU budget for all pilots combined.
 - **REVIEWER_MODEL = `gpt-5.4`** — Model used via Codex MCP for brainstorming and review. Must be an OpenAI model (e.g., `gpt-5.4`, `o3`, `gpt-4o`).
+- **REVIEWER_BACKEND = `codex`** — Default: Codex MCP (xhigh). Override with `— reviewer: oracle-pro` for GPT-5.4 Pro via Oracle MCP. See `shared-references/reviewer-routing.md`.
+- **OUTPUT_DIR = `idea-stage/`** — All idea-stage outputs go here. Create the directory if it doesn't exist.
 
 > 💡 Override via argument, e.g., `/idea-creator "topic" — pilot budget: 4h per idea, 20h total`.
 
@@ -68,10 +70,12 @@ Map the research area to understand what exists and where the gaps are.
 
 ### Phase 2: Idea Generation (brainstorm with external LLM)
 
-Use the external reviewer LLM (via LlmReview tool) for divergent thinking:
+Use the external LLM via Codex MCP for divergent thinking:
 
 ```
-LlmReview:
+mcp__codex__codex:
+  model: REVIEWER_MODEL
+  config: {"model_reasoning_effort": "xhigh"}
   prompt: |
     You are a senior ML researcher brainstorming research ideas.
 
@@ -100,7 +104,7 @@ LlmReview:
     Be creative but grounded. A great idea is one where the answer matters regardless of which way it goes.
 ```
 
-Save the review output for follow-up.
+Save the threadId for follow-up.
 
 ### Phase 3: First-Pass Filtering
 
@@ -126,7 +130,7 @@ For each surviving idea, run a deeper evaluation:
 
 1. **Novelty check**: Use the `/novelty-check` workflow (multi-source search + GPT-5.4 cross-verification) for each idea
 
-2. **Critical review**: Use `LlmReview` for adversarial critique:
+2. **Critical review**: Use GPT-5.4 via `mcp__codex__codex-reply` (same thread):
    ```
    Here are our top ideas after filtering:
    [paste surviving ideas with novelty check results]
@@ -170,7 +174,7 @@ Note: Skip this phase if the ideas are purely theoretical or if no GPU is availa
 
 ### Phase 6: Output — Ranked Idea Report
 
-Write a structured report to `IDEA_REPORT.md` in the project root:
+Write a structured report to `idea-stage/IDEA_REPORT.md`:
 
 ```markdown
 # Research Idea Report
@@ -251,6 +255,13 @@ if research-wiki/ exists:
         python3 research-wiki/research_wiki.py log research-wiki/ "idea-creator wrote N ideas (M recommended, K eliminated)"
 ```
 
+## Output Protocols
+
+> Follow these shared protocols for all output files:
+> - **[Output Versioning Protocol](shared-references/output-versioning.md)** — write timestamped file first, then copy to fixed name
+> - **[Output Manifest Protocol](shared-references/output-manifest.md)** — log every output to MANIFEST.md
+> - **[Output Language Protocol](shared-references/output-language.md)** — respect the project's language setting
+
 ## Key Rules
 
 - **Large file handling**: If the Write tool fails due to file size, immediately retry using Bash (`cat << 'EOF' > file`) to write in chunks. Do NOT ask the user for permission — just do it silently.
@@ -275,3 +286,7 @@ implement                     → write code
 /run-experiment               → deploy to GPU
 /auto-review-loop             → iterate until submission-ready
 ```
+
+## Review Tracing
+
+After each `mcp__codex__codex` or `mcp__codex__codex-reply` reviewer call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).

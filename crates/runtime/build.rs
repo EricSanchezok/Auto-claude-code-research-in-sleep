@@ -32,16 +32,33 @@ fn main() {
                 fs::copy(&skill_md, &dest).expect("copy skill file");
                 skill_names.push(name.clone());
 
-                // Also embed helper files (.py, .sh) in the same directory
+                // Also embed helper files (.py, .sh, .md) in the same directory
                 if let Ok(files) = fs::read_dir(entry.path()) {
                     for file in files.filter_map(Result::ok) {
                         let fname = file.file_name().to_string_lossy().to_string();
                         let is_helper = fname.ends_with(".py") || fname.ends_with(".sh");
-                        if is_helper && file.file_type().map_or(false, |t| t.is_file()) {
+                        let is_extra_md = fname.ends_with(".md") && fname != "SKILL.md";
+                        if (is_helper || is_extra_md) && file.file_type().map_or(false, |t| t.is_file()) {
                             let out_name = format!("{name}__{fname}");
                             let dest = skills_out.join(&out_name);
                             fs::copy(file.path(), &dest).expect("copy helper file");
                             let key = format!("{name}/{fname}");
+                            resource_entries.push((key, out_name));
+                        }
+                    }
+                }
+            } else {
+                // Directory without SKILL.md — treat as shared-references or similar
+                // Embed all .md files under it
+                let dir_name = entry.file_name().to_string_lossy().to_string();
+                if let Ok(files) = fs::read_dir(entry.path()) {
+                    for file in files.filter_map(Result::ok) {
+                        let fname = file.file_name().to_string_lossy().to_string();
+                        if fname.ends_with(".md") && file.file_type().map_or(false, |t| t.is_file()) {
+                            let out_name = format!("{dir_name}__{fname}");
+                            let dest = skills_out.join(&out_name);
+                            fs::copy(file.path(), &dest).expect("copy shared file");
+                            let key = format!("{dir_name}/{fname}");
                             resource_entries.push((key, out_name));
                         }
                     }

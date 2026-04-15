@@ -362,6 +362,10 @@ fn write_credentials_root(path: &PathBuf, root: &Map<String, Value>) -> io::Resu
         .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
     let temp_path = path.with_extension("json.tmp");
     fs::write(&temp_path, format!("{rendered}\n"))?;
+    // Windows fs::rename fails if target exists — remove first
+    if path.exists() {
+        let _ = fs::remove_file(path);
+    }
     fs::rename(temp_path, path)
 }
 

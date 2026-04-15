@@ -2,7 +2,7 @@
 name: result-to-claim
 description: Use when experiments complete to judge what claims the results support, what they don't, and what evidence is still missing. Codex MCP evaluates results against intended claims and routes to next action (pivot, supplement, or confirm). Use after experiments finish — before writing the paper or running ablations.
 argument-hint: [experiment-description-or-wandb-run]
-allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, LlmReview
+allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, mcp__codex__codex, mcp__codex__codex-reply
 ---
 
 # Result-to-Claim Gate
@@ -37,10 +37,11 @@ Assemble the key information:
 
 ### Step 2: Codex Judgment
 
-Send the collected results to the external reviewer (via LlmReview) for objective evaluation:
+Send the collected results to Codex for objective evaluation:
 
 ```
-LlmReview:
+mcp__codex__codex:
+  config: {"model_reasoning_effort": "xhigh"}
   prompt: |
     RESULT-TO-CLAIM EVALUATION
 
@@ -86,6 +87,30 @@ Extract structured fields from Codex response:
 - next_experiments_needed: "..."
 - confidence: high | medium | low
 ```
+
+### Step 3.5: Check Experiment Integrity (if audit exists)
+
+**Skip this step if `EXPERIMENT_AUDIT.json` does not exist.**
+
+```
+if EXPERIMENT_AUDIT.json exists:
+    read integrity_status from file
+    attach to verdict output:
+        integrity_status: pass | warn | fail
+
+    if integrity_status == "fail":
+        append to verdict: "[INTEGRITY CONCERN] — audit found issues, see EXPERIMENT_AUDIT.md"
+        downgrade confidence to "low" regardless of Codex judgment
+
+    if integrity_status == "warn":
+        append to verdict: "[INTEGRITY: WARN] — audit flagged potential issues"
+else:
+    integrity_status = "unavailable"
+    verdict is labeled "provisional — no integrity audit run"
+    (this does NOT block anything — pipeline continues normally)
+```
+
+See `shared-references/experiment-integrity.md` for the full integrity protocol.
 
 ### Step 4: Route Based on Verdict
 
@@ -159,3 +184,7 @@ if research-wiki/ exists:
 - If `confidence` is low, treat the judgment as inconclusive and add experiments rather than committing to a claim.
 - If Codex MCP is unavailable (call fails), CC makes its own judgment and marks it `[pending Codex review]` — do not block the pipeline.
 - Always record the verdict and reasoning in findings.md, regardless of outcome.
+
+## Review Tracing
+
+After each `mcp__codex__codex` or `mcp__codex__codex-reply` reviewer call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).

@@ -997,6 +997,12 @@ fn run_repl(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut cli = LiveCli::new(model, true, allowed_tools, permission_mode)?;
     let mut editor = input::LineEditor::new("\x1b[38;5;74m❯\x1b[0m ", slash_command_completion_candidates());
+
+    // Install Ctrl+C handler: set runtime interrupt flag instead of killing the process
+    let _ = ctrlc::set_handler(|| {
+        runtime::set_interrupt();
+    });
+
     println!("{}", cli.startup_banner());
 
     loop {
@@ -1011,8 +1017,22 @@ fn run_repl(
                     break;
                 }
                 if let Some(command) = SlashCommand::parse(&trimmed) {
-                    if cli.handle_repl_command(command)? {
-                        cli.persist_session()?;
+                    // Clear interrupt flag before command
+                    runtime::clear_interrupt();
+                    match cli.handle_repl_command(command) {
+                        Ok(persist) => {
+                            if persist {
+                                let _ = cli.persist_session();
+                            }
+                        }
+                        Err(e) => {
+                            if runtime::is_interrupted() {
+                                eprintln!("\n\x1b[38;5;208m● Interrupted\x1b[0m");
+                            } else {
+                                eprintln!("\n\x1b[38;5;203m● Error:\x1b[0m {e}");
+                            }
+                            runtime::clear_interrupt();
+                        }
                     }
                     continue;
                 }
@@ -1021,7 +1041,17 @@ fn run_repl(
                 let term_w = crossterm::terminal::size().map(|(w, _)| w as usize).unwrap_or(80);
                 let sep = "─".repeat(term_w.min(80));
                 println!("\x1b[38;5;240m{sep}\x1b[0m");
-                cli.run_turn(&trimmed)?;
+                // Clear interrupt flag before starting
+                runtime::clear_interrupt();
+                if let Err(e) = cli.run_turn(&trimmed) {
+                    if runtime::is_interrupted() {
+                        eprintln!("\n\x1b[38;5;208m● Interrupted\x1b[0m");
+                    } else {
+                        eprintln!("\n\x1b[38;5;203m● Error:\x1b[0m {e}");
+                    }
+                    runtime::clear_interrupt();
+                    // Don't exit REPL — let user retry or switch model
+                }
             }
             input::ReadOutcome::Cancel => {}
             input::ReadOutcome::Exit => {
@@ -1056,6 +1086,14 @@ struct LiveCli {
     system_prompt: Vec<String>,
     runtime: ConversationRuntime<ExecutorClient, CliToolExecutor>,
     session: SessionHandle,
+    /// Plan mode state: stores original permissions/tools before entering plan mode.
+    plan_mode: Option<PlanModeState>,
+}
+
+#[derive(Debug, Clone)]
+struct PlanModeState {
+    previous_permission_mode: PermissionMode,
+    previous_allowed_tools: Option<AllowedToolSet>,
 }
 
 impl LiveCli {
@@ -1096,6 +1134,7 @@ impl LiveCli {
             system_prompt,
             runtime,
             session,
+            plan_mode: None,
         };
         cli.persist_session()?;
         Ok(cli)
@@ -1404,15 +1443,7 @@ impl LiveCli {
             SlashCommand::Reviewer { model } => self.set_reviewer(model)?,
             SlashCommand::Setup => self.run_inline_setup()?,
             SlashCommand::Plan { task } => {
-                let task_desc = task.unwrap_or_else(|| "the user's request".to_string());
-                let plan_prompt = format!(
-                    "Create a detailed step-by-step plan for: {task_desc}\n\n\
-                     Format as a numbered list. For each step, explain what you'll do and why.\n\
-                     After presenting the plan, ask for confirmation before executing.\n\
-                     Do NOT start executing until the user confirms."
-                );
-                self.run_turn(&plan_prompt)?;
-                false
+                self.handle_plan_mode(task.as_deref())?
             }
             SlashCommand::Tasks { action } => {
                 Self::handle_tasks(action.as_deref())?;
@@ -2041,6 +2072,149 @@ impl LiveCli {
             Some(other) => {
                 println!("Unknown /session action '{other}'. Use /session list or /session switch <session-id>.");
                 Ok(false)
+            }
+        }
+    }
+
+    fn handle_plan_mode(
+        &mut self,
+        task: Option<&str>,
+    ) -> Result<bool, Box<dyn std::error::Error>> {
+        match task.map(str::trim) {
+            // /plan execute — exit plan mode and execute
+            Some(arg) if arg.starts_with("execute") => {
+                if self.plan_mode.is_none() {
+                    println!("Not in plan mode. Use /plan <task> to enter plan mode first.");
+                    return Ok(false);
+                }
+                let state = self.plan_mode.as_ref().expect("plan_mode checked above").clone();
+                let session = self.runtime.session().clone();
+                let new_runtime = match build_runtime(
+                    session,
+                    self.model.clone(),
+                    self.system_prompt.clone(),
+                    true,
+                    true,
+                    state.previous_allowed_tools.clone(),
+                    state.previous_permission_mode,
+                ) {
+                    Ok(rt) => rt,
+                    Err(e) => {
+                        eprintln!("\x1b[1;31mFailed to exit plan mode:\x1b[0m {e}");
+                        return Ok(false);
+                    }
+                };
+                // Commit only on success
+                self.runtime = new_runtime;
+                self.permission_mode = state.previous_permission_mode;
+                self.allowed_tools = state.previous_allowed_tools;
+                self.plan_mode = None;
+                println!(
+                    "\x1b[1;32m✓\x1b[0m Plan mode ended. Permissions restored to \x1b[1m{}\x1b[0m.",
+                    self.permission_mode.as_str()
+                );
+                let extra = arg.strip_prefix("execute").unwrap_or("").trim();
+                let exec_prompt = if extra.is_empty() {
+                    "Execute the plan you proposed. Proceed step by step.".to_string()
+                } else {
+                    format!("Execute the plan you proposed. Additional instructions: {extra}")
+                };
+                self.run_turn(&exec_prompt)?;
+                Ok(true)
+            }
+            // /plan exit — exit plan mode without executing
+            Some("exit") => {
+                if let Some(state) = self.plan_mode.as_ref().cloned() {
+                    let session = self.runtime.session().clone();
+                    let new_runtime = match build_runtime(
+                        session,
+                        self.model.clone(),
+                        self.system_prompt.clone(),
+                        true,
+                        true,
+                        state.previous_allowed_tools.clone(),
+                        state.previous_permission_mode,
+                    ) {
+                        Ok(rt) => rt,
+                        Err(e) => {
+                            eprintln!("\x1b[1;31mFailed to exit plan mode:\x1b[0m {e}");
+                            return Ok(false);
+                        }
+                    };
+                    self.runtime = new_runtime;
+                    self.permission_mode = state.previous_permission_mode;
+                    self.allowed_tools = state.previous_allowed_tools;
+                    self.plan_mode = None;
+                    println!(
+                        "\x1b[1;32m✓\x1b[0m Plan mode exited. Permissions restored to \x1b[1m{}\x1b[0m.",
+                        self.permission_mode.as_str()
+                    );
+                } else {
+                    println!("Not in plan mode.");
+                }
+                Ok(false)
+            }
+            // /plan <task> — enter plan mode
+            _ => {
+                if self.plan_mode.is_some() {
+                    println!("Already in plan mode. Use /plan execute or /plan exit.");
+                    return Ok(false);
+                }
+
+                // Save previous state for rollback
+                let prev_perm = self.permission_mode;
+                let prev_tools = self.allowed_tools.clone();
+
+                // Prepare plan-mode tools
+                let plan_tools: AllowedToolSet = [
+                    "read_file", "glob_search", "grep_search",
+                    "WebFetch", "WebSearch", "ToolSearch", "Skill",
+                ].iter().map(|s| s.to_string()).collect();
+
+                // Try rebuilding runtime FIRST, then commit state only on success
+                let session = self.runtime.session().clone();
+                let new_runtime = match build_runtime(
+                    session,
+                    self.model.clone(),
+                    self.system_prompt.clone(),
+                    true,
+                    true,
+                    Some(plan_tools.clone()),
+                    PermissionMode::ReadOnly,
+                ) {
+                    Ok(rt) => rt,
+                    Err(e) => {
+                        eprintln!("\x1b[1;31mFailed to enter plan mode:\x1b[0m {e}");
+                        return Ok(false);
+                    }
+                };
+
+                // Commit state only after runtime built successfully
+                self.runtime = new_runtime;
+                self.allowed_tools = Some(plan_tools);
+                self.permission_mode = PermissionMode::ReadOnly;
+                self.plan_mode = Some(PlanModeState {
+                    previous_permission_mode: prev_perm,
+                    previous_allowed_tools: prev_tools,
+                });
+
+                println!(
+                    "\x1b[1;34m●\x1b[0m \x1b[1mPlan mode\x1b[0m — read-only tools only. \
+                     Use \x1b[1m/plan execute\x1b[0m to run or \x1b[1m/plan exit\x1b[0m to cancel."
+                );
+
+                let task_desc = task.unwrap_or("the user's request");
+                let plan_prompt = format!(
+                    "You are in PLAN MODE. You can ONLY read and search — no writing, editing, or commands.\n\n\
+                     Analyze the codebase and create a detailed step-by-step plan for: {task_desc}\n\n\
+                     For each step:\n\
+                     1. What file(s) to change and why\n\
+                     2. The specific changes needed\n\
+                     3. Potential risks or edge cases\n\n\
+                     Do NOT attempt to execute anything. Only produce the plan."
+                );
+                self.run_turn(&plan_prompt)?;
+                Ok(true)
             }
         }
     }
@@ -3269,6 +3443,11 @@ impl ApiClient for AnthropicRuntimeClient {
                 .await
                 .map_err(|error| RuntimeError::new(error.to_string()))?
             {
+                // Check for Ctrl+C interrupt between events
+                if runtime::is_interrupted() {
+                    runtime::clear_interrupt();
+                    return Err(RuntimeError::new("interrupted by user"));
+                }
                 match event {
                     ApiStreamEvent::MessageStart(start) => {
                         for block in start.message.content {
@@ -3543,8 +3722,30 @@ fn format_tool_result(name: &str, output: &str, is_error: bool) -> String {
         "edit_file" | "Edit" => format_edit_result(icon, &parsed),
         "glob_search" | "Glob" => format_glob_result(icon, &parsed),
         "grep_search" | "Grep" => format_grep_result(icon, &parsed),
+        "web_search" | "WebSearch" => {
+            // Show just query and hit count
+            let query = parsed.get("query").and_then(|v| v.as_str()).unwrap_or("?");
+            let hit_count = parsed.get("results")
+                .and_then(|v| v.as_array())
+                .map_or(0, |a| a.iter().filter(|v| v.get("content").is_some()).flat_map(|v| v.get("content").and_then(|c| c.as_array())).map(|a| a.len()).sum::<usize>());
+            format!("{icon} \x1b[38;5;245mWebSearch:\x1b[0m \"{query}\" ({hit_count} results)")
+        }
+        "web_fetch" | "WebFetch" => {
+            let url = parsed.get("url").and_then(|v| v.as_str()).unwrap_or("?");
+            let bytes = parsed.get("bytes").and_then(|v| v.as_u64()).unwrap_or(0);
+            let code = parsed.get("code").and_then(|v| v.as_u64()).unwrap_or(0);
+            format!("{icon} \x1b[38;5;245mWebFetch:\x1b[0m {url} ({code}, {bytes} bytes)")
+        }
+        "LlmReview" => {
+            let summary = truncate_for_summary(output.trim(), 120);
+            format!("{icon} \x1b[38;5;245mLlmReview:\x1b[0m {summary}")
+        }
+        "Skill" => {
+            let skill = parsed.get("skill").and_then(|v| v.as_str()).unwrap_or("?");
+            format!("{icon} \x1b[38;5;245mSkill:\x1b[0m /{skill} loaded")
+        }
         _ => {
-            let summary = truncate_for_summary(output.trim(), 200);
+            let summary = truncate_for_summary(output.trim(), 120);
             format!("{icon} \x1b[38;5;245m{name}:\x1b[0m {summary}")
         }
     };
@@ -4206,6 +4407,10 @@ fn configure_codex_mcp(codex_path: &Path) -> Result<bool, Box<dyn std::error::Er
     // Atomic write: write to temp file then rename
     let tmp_path = config_path.with_extension("json.tmp");
     fs::write(&tmp_path, serde_json::to_string_pretty(&config)?)?;
+    // Windows fs::rename fails if target exists — remove first
+    if config_path.exists() {
+        let _ = fs::remove_file(&config_path);
+    }
     fs::rename(&tmp_path, &config_path)?;
 
     Ok(true)
