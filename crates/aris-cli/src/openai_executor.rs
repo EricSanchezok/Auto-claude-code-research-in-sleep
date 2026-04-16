@@ -31,8 +31,13 @@ pub fn resolve_openai_executor_config() -> Option<OpenAIExecutorConfig> {
         .ok()
         .filter(|s| !s.is_empty())?;
 
+    // Treat empty/whitespace-only values the same as unset, and trim otherwise
+    // so accidental leading/trailing whitespace doesn't produce a malformed URL.
     let base_url = std::env::var("EXECUTOR_BASE_URL")
-        .unwrap_or_else(|_| DEFAULT_OPENAI_BASE_URL.to_string());
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| DEFAULT_OPENAI_BASE_URL.to_string());
 
     Some(OpenAIExecutorConfig { api_key, base_url })
 }
@@ -554,4 +559,102 @@ fn convert_tool_spec_openai(spec: &ToolSpec) -> Value {
             "parameters": spec.input_schema,
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use runtime::{ContentBlock, ConversationMessage, MessageRole};
+
+    #[test]
+    fn convert_messages_drops_system_role_in_messages_array() {
+        // Regression: before v0.4.2 the auto-compaction continuation message
+        // was role=System and was silently dropped here, erasing the summary.
+        let messages = vec![
+            ConversationMessage {
+                role: MessageRole::System,
+                blocks: vec![ContentBlock::Text {
+                    text: "compaction summary".into(),
+                }],
+                usage: None,
+            },
+            ConversationMessage::user_text("next question"),
+        ];
+        let result = convert_messages_openai(&messages, None, false, &std::collections::HashMap::new());
+        // Should contain only the User message; the System one is skipped.
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0]["role"], "user");
+        assert!(result[0]["content"]
+            .as_str()
+            .unwrap_or("")
+            .contains("next question"));
+    }
+
+    #[test]
+    fn resolve_base_url_falls_back_for_empty_or_whitespace() {
+        use std::sync::Mutex;
+        // Serialize env mutation to avoid cross-test races.
+        static LOCK: Mutex<()> = Mutex::new(());
+        let _g = LOCK.lock().unwrap();
+
+        let prior_provider = std::env::var("EXECUTOR_PROVIDER").ok();
+        let prior_api_key = std::env::var("EXECUTOR_API_KEY").ok();
+        let prior_base_url = std::env::var("EXECUTOR_BASE_URL").ok();
+
+        std::env::set_var("EXECUTOR_PROVIDER", "openai");
+        std::env::set_var("EXECUTOR_API_KEY", "sk-test");
+
+        // Empty string → falls back to default.
+        std::env::set_var("EXECUTOR_BASE_URL", "");
+        let cfg = resolve_openai_executor_config().expect("config");
+        assert_eq!(cfg.base_url, DEFAULT_OPENAI_BASE_URL);
+
+        // Whitespace-only → falls back to default.
+        std::env::set_var("EXECUTOR_BASE_URL", "   ");
+        let cfg = resolve_openai_executor_config().expect("config");
+        assert_eq!(cfg.base_url, DEFAULT_OPENAI_BASE_URL);
+
+        // Whitespace-padded custom URL → trimmed.
+        std::env::set_var("EXECUTOR_BASE_URL", "  https://gmncode.cn  ");
+        let cfg = resolve_openai_executor_config().expect("config");
+        assert_eq!(cfg.base_url, "https://gmncode.cn");
+
+        // Restore prior state to avoid polluting sibling tests.
+        match prior_provider {
+            Some(v) => std::env::set_var("EXECUTOR_PROVIDER", v),
+            None => std::env::remove_var("EXECUTOR_PROVIDER"),
+        }
+        match prior_api_key {
+            Some(v) => std::env::set_var("EXECUTOR_API_KEY", v),
+            None => std::env::remove_var("EXECUTOR_API_KEY"),
+        }
+        match prior_base_url {
+            Some(v) => std::env::set_var("EXECUTOR_BASE_URL", v),
+            None => std::env::remove_var("EXECUTOR_BASE_URL"),
+        }
+    }
+
+    #[test]
+    fn convert_messages_preserves_user_role_continuation() {
+        // After v0.4.2, the continuation uses User role and must survive.
+        let messages = vec![
+            ConversationMessage {
+                role: MessageRole::User,
+                blocks: vec![ContentBlock::Text {
+                    text: "compaction summary".into(),
+                }],
+                usage: None,
+            },
+            ConversationMessage::user_text("next question"),
+        ];
+        let result = convert_messages_openai(&messages, None, false, &std::collections::HashMap::new());
+        // Both User messages present.
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0]["role"], "user");
+        assert!(result[0]["content"]
+            .as_str()
+            .unwrap_or("")
+            .contains("compaction summary"));
+        assert_eq!(result[1]["role"], "user");
+    }
 }

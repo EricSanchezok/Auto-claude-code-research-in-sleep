@@ -12,6 +12,20 @@ use serde::{Deserialize, Serialize};
 const CONFIG_DIR: &str = ".config/aris";
 const CONFIG_FILE: &str = "config.json";
 
+/// Controls which env vars `apply_to_env_inner` is allowed to overwrite.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ApplyMode {
+    /// Only set env vars that are currently unset. Shell-provided vars win.
+    IfMissing,
+    /// Clear + re-apply all executor AND reviewer env vars. Used by REPL
+    /// `/setup` where the user explicitly reconfigured everything.
+    ForceAll,
+    /// Clear + re-apply only executor env vars. Used by mid-launch setup,
+    /// which only asks about executor auth; reviewer env vars set by the
+    /// user's shell must be preserved.
+    ForceExecutorOnly,
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ArisConfig {
     /// "anthropic" or "openai"
@@ -69,26 +83,45 @@ impl ArisConfig {
     }
 
     /// Apply saved config to environment variables.
-    /// If `force` is true, overwrite existing env vars (used by /setup in REPL).
+    /// Only sets vars that are currently unset or empty — shell-provided vars
+    /// always win. Used at startup before we know what auth the user has.
     pub fn apply_to_env(&self) {
-        self.apply_to_env_inner(false);
+        self.apply_to_env_inner(ApplyMode::IfMissing);
     }
 
+    /// Full clear + re-apply of both executor AND reviewer env vars.
+    /// Used by REPL `/setup` where the user explicitly reconfigured everything.
     pub fn force_apply_to_env(&self) {
-        self.apply_to_env_inner(true);
+        self.apply_to_env_inner(ApplyMode::ForceAll);
     }
 
-    fn apply_to_env_inner(&self, force: bool) {
-        // Executor provider — clean up stale env vars from previous provider on switch
-        if force {
-            // Clear ALL executor-related env vars first to prevent cross-contamination
+    /// Clear + re-apply only executor env vars; leave reviewer env vars alone.
+    /// Used by the mid-launch setup wizard, which only asks about executor auth
+    /// when that auth is missing. A shell-provided reviewer key (e.g.
+    /// `OPENAI_API_KEY` for the reviewer) must not be wiped just because the
+    /// user typed in an Anthropic executor key.
+    pub fn force_apply_executor_env(&self) {
+        self.apply_to_env_inner(ApplyMode::ForceExecutorOnly);
+    }
+
+    fn apply_to_env_inner(&self, mode: ApplyMode) {
+        let force_exec = matches!(mode, ApplyMode::ForceAll | ApplyMode::ForceExecutorOnly);
+        let force_rev = matches!(mode, ApplyMode::ForceAll);
+
+        if force_exec {
+            // Clear executor-related env vars to prevent cross-contamination
+            // between providers when switching.
             std::env::remove_var("EXECUTOR_PROVIDER");
             std::env::remove_var("EXECUTOR_API_KEY");
             std::env::remove_var("EXECUTOR_BASE_URL");
             std::env::remove_var("ANTHROPIC_API_KEY");
             std::env::remove_var("ANTHROPIC_AUTH_TOKEN");
             std::env::remove_var("ANTHROPIC_BASE_URL");
-            // Clear ALL reviewer-related env vars
+        }
+        if force_rev {
+            // Clear reviewer-related env vars — only when user explicitly
+            // reconfigured reviewer via REPL /setup. NOT cleared by mid-launch
+            // executor-only setup, to preserve shell-provided reviewer keys.
             std::env::remove_var("OPENAI_API_KEY");
             std::env::remove_var("GEMINI_API_KEY");
             std::env::remove_var("GLM_API_KEY");
@@ -99,6 +132,10 @@ impl ArisConfig {
             std::env::remove_var("ARIS_REVIEWER_PROVIDER");
             std::env::remove_var("ARIS_REVIEWER_AUTH_TOKEN");
         }
+        // The rest of the function uses `force_exec` and `force_rev` to decide
+        // whether to overwrite existing env vars.
+        let force = force_exec;
+        let force_reviewer = force_rev;
 
         if let Some(provider) = &self.executor_provider {
             if provider == "openai" {
@@ -144,37 +181,38 @@ impl ArisConfig {
             }
         }
 
-        // Reviewer API key
+        // Reviewer API key — gated on force_reviewer, not force_exec, so
+        // executor-only force does not clobber shell-provided reviewer keys.
         if let Some(reviewer_provider) = &self.reviewer_provider {
             if let Some(key) = &self.reviewer_api_key {
                 match reviewer_provider.as_str() {
                     "gemini" => {
-                        if force || std::env::var("GEMINI_API_KEY").is_err() {
+                        if force_reviewer || std::env::var("GEMINI_API_KEY").is_err() {
                             std::env::set_var("GEMINI_API_KEY", key);
                         }
                     }
                     "openai" => {
-                        if force || std::env::var("OPENAI_API_KEY").is_err() {
+                        if force_reviewer || std::env::var("OPENAI_API_KEY").is_err() {
                             std::env::set_var("OPENAI_API_KEY", key);
                         }
                     }
                     "glm" => {
-                        if force || std::env::var("GLM_API_KEY").is_err() {
+                        if force_reviewer || std::env::var("GLM_API_KEY").is_err() {
                             std::env::set_var("GLM_API_KEY", key);
                         }
                     }
                     "minimax" => {
-                        if force || std::env::var("MINIMAX_API_KEY").is_err() {
+                        if force_reviewer || std::env::var("MINIMAX_API_KEY").is_err() {
                             std::env::set_var("MINIMAX_API_KEY", key);
                         }
                     }
                     "kimi" => {
-                        if force || std::env::var("KIMI_API_KEY").is_err() {
+                        if force_reviewer || std::env::var("KIMI_API_KEY").is_err() {
                             std::env::set_var("KIMI_API_KEY", key);
                         }
                     }
                     "anthropic-compat" => {
-                        if force || std::env::var("ARIS_REVIEWER_AUTH_TOKEN").is_err() {
+                        if force_reviewer || std::env::var("ARIS_REVIEWER_AUTH_TOKEN").is_err() {
                             std::env::set_var("ARIS_REVIEWER_AUTH_TOKEN", key);
                         }
                     }
@@ -182,20 +220,20 @@ impl ArisConfig {
                 }
             }
             // Set reviewer provider env var
-            if force || std::env::var("ARIS_REVIEWER_PROVIDER").is_err() {
+            if force_reviewer || std::env::var("ARIS_REVIEWER_PROVIDER").is_err() {
                 std::env::set_var("ARIS_REVIEWER_PROVIDER", reviewer_provider);
             }
         }
 
         // Reviewer base URL
-        if force || std::env::var("ARIS_REVIEWER_BASE_URL").is_err() {
+        if force_reviewer || std::env::var("ARIS_REVIEWER_BASE_URL").is_err() {
             if let Some(url) = &self.reviewer_base_url {
                 std::env::set_var("ARIS_REVIEWER_BASE_URL", url);
             }
         }
 
         // Reviewer model
-        if force || std::env::var("ARIS_REVIEWER_MODEL").is_err() {
+        if force_reviewer || std::env::var("ARIS_REVIEWER_MODEL").is_err() {
             if let Some(model) = &self.reviewer_model {
                 std::env::set_var("ARIS_REVIEWER_MODEL", model);
             }

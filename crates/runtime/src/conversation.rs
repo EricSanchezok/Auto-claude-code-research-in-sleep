@@ -906,7 +906,7 @@ mod tests {
         assert!(result.summary.contains("Conversation summary"));
         assert_eq!(
             result.compacted_session.messages[0].role,
-            MessageRole::System
+            MessageRole::User
         );
     }
 
@@ -974,7 +974,7 @@ mod tests {
                 removed_message_count: 2,
             })
         );
-        assert_eq!(runtime.session().messages[0].role, MessageRole::System);
+        assert_eq!(runtime.session().messages[0].role, MessageRole::User);
     }
 
     #[test]

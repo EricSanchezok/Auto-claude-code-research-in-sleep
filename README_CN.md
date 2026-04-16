@@ -26,6 +26,8 @@
 
 ## 📰 最新动态
 
+> **v0.4.2** (2026-04-17) — **Auto-compaction 崩溃修复**(skill 跑完后的空响应问题) | OpenAI-compat executor 下 compaction 摘要不再丢失 | 自定义 executor base URL 启动 setup 后生效 | shell 预设 API key 不再被清掉 | `EXECUTOR_BASE_URL` trim + 空值处理
+
 > **v0.4.1** (2026-04-15) — Reviewer/Executor 自动重试 (429/5xx/网络抖动) | Ctrl+C 后标志污染修复 | 每次 reviewer 请求新 HTTP client(绕过坏连接池) | 详细错误链
 >
 > **v0.4.0** (2026-04-15) — **Plan 模式** (`/plan`) | Ctrl+C 协作式中断(不再直接退出) | API 错误不再退出 REPL | 工具输出折叠 | 同步 62 个 skills

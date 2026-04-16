@@ -428,7 +428,7 @@ pub fn handle_slash_command(
                 "Compaction skipped: session is below the compaction threshold.".to_string()
             } else {
                 format!(
-                    "Compacted {} messages into a resumable system summary.",
+                    "Compacted {} messages into a resumable summary.",
                     result.removed_message_count
                 )
             };
@@ -605,7 +605,7 @@ mod tests {
         assert!(help.contains("/version"));
         assert!(help.contains("/export [file]"));
         assert!(help.contains("/session [list|switch <session-id>]"));
-        assert_eq!(slash_command_specs().len(), 27);
+        assert_eq!(slash_command_specs().len(), 28);
         assert_eq!(resume_supported_slash_commands().len(), 11);
     }
 
@@ -635,8 +635,10 @@ mod tests {
         )
         .expect("slash command should be handled");
 
-        assert!(result.message.contains("Compacted 2 messages"));
-        assert_eq!(result.session.messages[0].role, MessageRole::System);
+        // Tail [Tool, Assistant] has no User message, so the safe boundary
+        // forward-scan drops the whole tail and summarizes all 4 messages.
+        assert!(result.message.contains("Compacted 4 messages"));
+        assert_eq!(result.session.messages[0].role, MessageRole::User);
     }
 
     #[test]

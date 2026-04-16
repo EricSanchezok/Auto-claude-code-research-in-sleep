@@ -82,18 +82,47 @@ pub fn compact_session(session: &Session, config: CompactionConfig) -> Compactio
         };
     }
 
-    let keep_from = session
+    let initial_keep_from = session
         .messages
         .len()
         .saturating_sub(config.preserve_recent_messages);
+
+    // Find a safe preservation boundary: the first message in `preserved` must be
+    // a User message (not Tool/Assistant) to avoid dangling tool_use/tool_result
+    // pairs crossing the compaction line, which causes the API to return an empty
+    // stream ("assistant stream produced no content").
+    //
+    // Scan forward from initial_keep_from for the next User message. If none is
+    // found in the tail window, drop all preserved messages — the summary alone
+    // is enough context to continue.
+    let mut keep_from = initial_keep_from;
+    while keep_from < session.messages.len()
+        && session.messages[keep_from].role != MessageRole::User
+    {
+        keep_from += 1;
+    }
+    // Critical: `removed` must cover everything NOT in `preserved`, otherwise
+    // the messages in [initial_keep_from, keep_from) silently disappear from
+    // both the summary and the preserved tail.
     let removed = &session.messages[..keep_from];
-    let preserved = session.messages[keep_from..].to_vec();
+    let preserved = if keep_from < session.messages.len() {
+        session.messages[keep_from..].to_vec()
+    } else {
+        Vec::new()
+    };
+    let removed_count = removed.len();
+
     let summary = summarize_messages(removed);
     let formatted_summary = format_compact_summary(&summary);
     let continuation = get_compact_continuation_message(&summary, true, !preserved.is_empty());
 
+    // Use User role (not System) for the continuation message. This is NOT
+    // cosmetic: `openai_executor::convert_messages_openai` explicitly skips
+    // MessageRole::System messages, so under the old code the compaction
+    // summary was silently dropped for OpenAI-compatible executors. User role
+    // is serialized as "user" by every executor.
     let mut compacted_messages = vec![ConversationMessage {
-        role: MessageRole::System,
+        role: MessageRole::User,
         blocks: vec![ContentBlock::Text { text: continuation }],
         usage: None,
     }];
@@ -106,7 +135,7 @@ pub fn compact_session(session: &Session, config: CompactionConfig) -> Compactio
             version: session.version,
             messages: compacted_messages,
         },
-        removed_message_count: removed.len(),
+        removed_message_count: removed_count,
     }
 }
 
@@ -403,7 +432,11 @@ mod tests {
     }
 
     #[test]
-    fn compacts_older_messages_into_a_system_summary() {
+    fn compacts_older_messages_into_a_user_summary() {
+        // Session: User → Assistant → Tool → Assistant
+        // With preserve=2, initial_keep_from = 2 (Tool), scan forward → no User
+        // → preserved is empty, all 4 messages summarized, only the continuation
+        // User message remains.
         let session = Session {
             version: 1,
             messages: vec![
@@ -430,10 +463,12 @@ mod tests {
             },
         );
 
-        assert_eq!(result.removed_message_count, 2);
+        // All 4 messages got summarized (since no User in the tail window).
+        assert_eq!(result.removed_message_count, 4);
+        assert_eq!(result.compacted_session.messages.len(), 1);
         assert_eq!(
             result.compacted_session.messages[0].role,
-            MessageRole::System
+            MessageRole::User
         );
         assert!(matches!(
             &result.compacted_session.messages[0].blocks[0],
@@ -441,15 +476,109 @@ mod tests {
         ));
         assert!(result.formatted_summary.contains("Scope:"));
         assert!(result.formatted_summary.contains("Key timeline:"));
-        assert!(should_compact(
+        assert!(
+            estimate_session_tokens(&result.compacted_session) < estimate_session_tokens(&session)
+        );
+    }
+
+    #[test]
+    fn preservation_window_starts_mid_tool_chain_is_moved_to_next_user() {
+        // Session shape: Oldest[0..=3] summarized, Tail[4..]=Tool,Assistant,User,Assistant.
+        // With preserve=4, initial_keep_from=4 points at Tool (dangling tool_result).
+        // Forward scan should skip Tool and Assistant, land on User at index 6.
+        // Expected: preserved = [User, Assistant], removed_count = 6 (0..6).
+        let session = Session {
+            version: 1,
+            messages: vec![
+                ConversationMessage::user_text("old ".repeat(300)),
+                ConversationMessage::assistant(vec![ContentBlock::ToolUse {
+                    id: "t1".into(),
+                    name: "bash".into(),
+                    input: "{}".into(),
+                }]),
+                ConversationMessage::tool_result("t1", "bash", "ok", false),
+                ConversationMessage::assistant(vec![ContentBlock::Text {
+                    text: "old-reply".into(),
+                }]),
+                // Tail window starts here (dangling tool_result — its tool_use at
+                // index 1 is in the removed portion if we stopped naively).
+                ConversationMessage::tool_result("t1", "bash", "done", false),
+                ConversationMessage::assistant(vec![ContentBlock::Text {
+                    text: "assistant-text".into(),
+                }]),
+                ConversationMessage::user_text("next question"),
+                ConversationMessage::assistant(vec![ContentBlock::Text {
+                    text: "answer".into(),
+                }]),
+            ],
+        };
+
+        let result = compact_session(
+            &session,
+            CompactionConfig {
+                preserve_recent_messages: 4,
+                max_estimated_tokens: 1,
+            },
+        );
+
+        // removed = indices [0..=5] (the forward scan dropped Tool, Assistant
+        // before the User at index 6), so 6 removed.
+        assert_eq!(result.removed_message_count, 6);
+        // Compacted session: [User-continuation, User("next question"), Assistant("answer")]
+        assert_eq!(result.compacted_session.messages.len(), 3);
+        assert_eq!(
+            result.compacted_session.messages[0].role,
+            MessageRole::User
+        );
+        assert_eq!(
+            result.compacted_session.messages[1].role,
+            MessageRole::User
+        );
+        assert!(matches!(
+            &result.compacted_session.messages[1].blocks[0],
+            ContentBlock::Text { text } if text == "next question"
+        ));
+        assert_eq!(
+            result.compacted_session.messages[2].role,
+            MessageRole::Assistant
+        );
+    }
+
+    #[test]
+    fn preserved_window_drops_when_no_user_in_tail() {
+        // Session: user messages are only at index 0, rest is tool/assistant.
+        // With preserve=2, forward scan from index N-2 finds no User → drop all
+        // preserved, keep only the summary.
+        let session = Session {
+            version: 1,
+            messages: vec![
+                ConversationMessage::user_text("question ".repeat(300)),
+                ConversationMessage::assistant(vec![ContentBlock::ToolUse {
+                    id: "t".into(),
+                    name: "bash".into(),
+                    input: "{}".into(),
+                }]),
+                ConversationMessage::tool_result("t", "bash", "result", false),
+                ConversationMessage::assistant(vec![ContentBlock::Text {
+                    text: "final".into(),
+                }]),
+            ],
+        };
+
+        let result = compact_session(
             &session,
             CompactionConfig {
                 preserve_recent_messages: 2,
                 max_estimated_tokens: 1,
-            }
-        ));
-        assert!(
-            estimate_session_tokens(&result.compacted_session) < estimate_session_tokens(&session)
+            },
+        );
+
+        // All 4 messages summarized, only continuation (User) remains.
+        assert_eq!(result.removed_message_count, 4);
+        assert_eq!(result.compacted_session.messages.len(), 1);
+        assert_eq!(
+            result.compacted_session.messages[0].role,
+            MessageRole::User
         );
     }
 

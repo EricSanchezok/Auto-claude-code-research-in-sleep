@@ -57,6 +57,91 @@ const GIT_SHA: Option<&str> = option_env!("GIT_SHA");
 
 pub(crate) type AllowedToolSet = BTreeSet<String>;
 
+/// True if the process has at least one usable executor auth source for the
+/// currently selected executor provider. Mirrors the real resolution in
+/// `resolve_openai_executor_config` and `api::resolve_startup_auth_source` so
+/// the "no API key, run setup" guard does not misfire for users with
+/// legitimate credentials. We deliberately do NOT probe the macOS keychain —
+/// the API client handles that with proper error propagation.
+///
+/// Importantly, this is gated on `EXECUTOR_PROVIDER`: if the user selected
+/// `openai`, an Anthropic OAuth token on disk is NOT usable auth — letting it
+/// pass the gate would skip setup then fall back to an Anthropic runtime with
+/// an OpenAI model, which fails in confusing ways.
+fn has_any_executor_auth() -> bool {
+    let env_non_empty = |name: &str| {
+        std::env::var(name)
+            .ok()
+            .map(|v| !v.trim().is_empty())
+            .unwrap_or(false)
+    };
+
+    // Use EXACT match (no trim) to stay 1:1 with `resolve_openai_executor_config()`.
+    // If we trimmed here but the resolver didn't, a value like `"openai "` would
+    // pass the gate but the resolver would reject it, causing a silent fallback
+    // to the Anthropic runtime with an OpenAI model.
+    let openai_selected = std::env::var("EXECUTOR_PROVIDER")
+        .ok()
+        .as_deref()
+        == Some("openai");
+
+    if openai_selected {
+        // OpenAI-compat executor: only OpenAI-style keys count. Anthropic
+        // OAuth tokens can't authenticate an OpenAI endpoint, so they must
+        // NOT make this function return true.
+        return env_non_empty("EXECUTOR_API_KEY") || env_non_empty("OPENAI_API_KEY");
+    }
+
+    // Anthropic executor (default or explicit): native API key or Bearer token.
+    if env_non_empty("ANTHROPIC_API_KEY") || env_non_empty("ANTHROPIC_AUTH_TOKEN") {
+        return true;
+    }
+
+    // Saved OAuth credentials. Mirrors `api::resolve_startup_auth_source`:
+    //   - non-expired token → usable
+    //   - expired token + refresh_token → usable ONLY if the runtime OAuth
+    //     config is loadable (refresh needs the client_id/endpoint from it)
+    //   - expired without refresh → NOT usable, fall through to setup
+    //
+    // `load_oauth_credentials` / `runtime_oauth_config_loadable` are offline
+    // file reads; no network calls happen in this gate.
+    if let Ok(Some(token)) = runtime::load_oauth_credentials() {
+        let expired = token
+            .expires_at
+            .is_some_and(|ts| ts <= unix_timestamp_now());
+        if !expired {
+            return true;
+        }
+        let has_refresh = token.refresh_token.as_deref().is_some_and(|s| !s.is_empty());
+        if has_refresh && runtime_oauth_config_loadable() {
+            return true;
+        }
+    }
+
+    false
+}
+
+/// True if the runtime OAuth config (client_id + endpoints) can be loaded from
+/// disk. Used by `has_any_executor_auth` to decide whether an expired-with-
+/// refresh token will actually be refreshable on first API call.
+fn runtime_oauth_config_loadable() -> bool {
+    let Ok(cwd) = env::current_dir() else {
+        return false;
+    };
+    ConfigLoader::default_for(&cwd)
+        .load()
+        .ok()
+        .and_then(|cfg| cfg.oauth().cloned())
+        .is_some()
+}
+
+fn unix_timestamp_now() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
 fn main() {
     if let Err(error) = run() {
         eprintln!(
@@ -77,16 +162,23 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().skip(1).collect();
     let action = parse_args(&args)?;
 
-    // For REPL and Prompt modes: if no executor API key is available, run setup first
+    // For REPL and Prompt modes: if no executor auth is available, run setup first.
+    // Must mirror the real auth resolution in resolve_openai_executor_config() +
+    // api::resolve_startup_auth_source() — otherwise a user whose auth DOES work
+    // (shell env var or saved OAuth credentials) would be wrongly routed through
+    // setup, and force_apply_to_env() would erase their shell-provided key.
     let needs_api_key = matches!(action, CliAction::Repl { .. } | CliAction::Prompt { .. });
-    if needs_api_key
-        && std::env::var("ANTHROPIC_API_KEY").is_err()
-        && std::env::var("EXECUTOR_API_KEY").is_err()
-        && std::env::var("ANTHROPIC_AUTH_TOKEN").is_err()
-    {
+    if needs_api_key && !has_any_executor_auth() {
         println!("\x1b[1;33mNo API key found.\x1b[0m Let's set up ARIS first.\n");
         let new_config = config::run_interactive_setup()?;
-        new_config.apply_to_env();
+        // Force-apply only EXECUTOR env vars. This overrides any stale
+        // executor values left over from `saved_config.apply_to_env()` above
+        // (e.g. `EXECUTOR_BASE_URL` pointing at an old proxy URL), while
+        // preserving shell-provided reviewer keys like `OPENAI_API_KEY`,
+        // `GEMINI_API_KEY`, etc. Using the full `force_apply_to_env()` here
+        // would wipe a reviewer key the user set in their shell but did not
+        // retype during the wizard.
+        new_config.force_apply_executor_env();
     }
 
     match action {
