@@ -32,40 +32,41 @@ Everything else is preserved: workflow logic, artifact contracts (Markdown files
 
 ## Installation
 
-### 1. Install skills
-
-Copy the skills to your Synergy skill directory:
+### One-click install
 
 ```bash
-cp -r skills/* ~/.synergy/config/skills/
+# Clone and install in one step
+git clone https://github.com/EricSanchezok/Auto-claude-code-research-in-sleep.git
+cd Auto-claude-code-research-in-sleep
+bash install.sh
 ```
 
-Or symlink for easier updates:
+Or install directly via curl:
 
 ```bash
+curl -sL https://raw.githubusercontent.com/EricSanchezok/Auto-claude-code-research-in-sleep/main/install.sh | bash
+```
+
+The installer will:
+- Symlink all skills to `~/.synergy/config/skills/` (or copy if symlinks fail)
+- Copy `reviewer.md` and `auditor.md` agents to `~/.synergy/config/agent/`
+- Skip skills that already exist (won't overwrite your customizations)
+
+To uninstall: `bash install.sh --uninstall`
+
+### Manual install
+
+If you prefer manual control:
+
+```bash
+# Skills (symlink recommended for easy git pull updates)
 ln -s "$(pwd)/skills"/* ~/.synergy/config/skills/
+
+# Agents
+cp agents/reviewer.md agents/auditor.md ~/.synergy/config/agent/
 ```
 
-### 2. Install agents
-
-Copy the custom agent definitions:
-
-```bash
-cp agents/reviewer.md ~/.synergy/config/agent/
-cp agents/auditor.md ~/.synergy/config/agent/
-```
-
-### 3. Install tools (optional)
-
-If you want the helper scripts (arxiv_fetch.py, semantic_scholar_fetch.py, save_trace.sh):
-
-```bash
-cp -r tools/ ~/.synergy/config/skills/shared-tools/
-```
-
-The skills look for these in `tools/` first, then fall back to searching `~/.synergy/config/skills/` and `~/.claude/skills/`.
-
-### 4. Install MCP servers (optional)
+### MCP servers (optional)
 
 If you want Feishu notifications or alternative LLM reviewer backends:
 
