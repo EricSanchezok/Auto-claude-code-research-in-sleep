@@ -20,7 +20,7 @@ Periodically read WandB metrics during training to catch problems early. Do not 
 ## When to Use
 
 - After training is confirmed running (session alive, loss decreasing for first few steps)
-- Set up via CronCreate to fire periodically during training
+- Set up via agenda watch/every trigger to fire periodically during training
 - **This skill checks training QUALITY, not process HEALTH.** Process health (session alive, GPU utilization) is [watchdog.py](../../tools/watchdog.py)'s job.
 
 ## Workflow
@@ -109,14 +109,132 @@ Use both together:
 - When stopping training, always save the WandB run URL and key metrics as evidence.
 - If both WandB and log files are unreachable, report the connectivity issue and try again next interval. Do not assume training is broken.
 - Gradually increase check interval when healthy (10 → 20 → 30 → 60 min). Reset to 10 min after any anomaly.
-- This skill is meant to be automated via CronCreate — do not ask the user whether to set it up. Just set it.
+- This skill is meant to be automated via agenda (see Synergy Agenda Integration below) — do not ask the user whether to set it up. Just set it.
 
-## CronCreate Setup Example
+## Synergy Agenda Integration
+
+Instead of manually creating CronCreate jobs, use Synergy's agenda system with **watch triggers** for more reliable, context-aware monitoring.
+
+### Why Agenda Watch Triggers
+
+The original CronCreate pattern has several limitations:
+- Requires manual creation and deletion of cron jobs
+- Cannot adapt check intervals automatically
+- No awareness of training completion — keeps running even after training ends
+
+Agenda watch triggers solve this by:
+- **Polling a command** on a schedule and firing only when output changes (or matches a pattern)
+- **Running in project scope** — the agenda item inherits your current working directory
+- **Delivering results back to your current conversation** — no need to check a separate session
+
+### Setup via Agenda
+
+After training is confirmed stable, create an agenda item:
 
 ```
-After training is confirmed stable:
-  CronCreate (recurring, every 10 minutes initially):
-    "Run /training-check for wandb run <entity>/<project>/<run_id>"
+agenda_create(
+  title: "Training health check: <run_id>",
+  triggers: [{
+    type: "every",
+    interval: "10m"           // Start at 10 min, can be adjusted
+  }],
+  workDirectory: "<current project directory>",
+  delivery: "auto",           // Results return to THIS conversation
+  prompt: """
+    Run a training health check for wandb run <entity>/<project>/<run_id>.
+
+    Steps:
+    1. Pull the latest metrics from WandB (or SSH + log file fallback)
+    2. Check signals: loss trend, eval metrics, NaN/Inf, spikes, gradient norm
+    3. If clearly bad (NaN, divergence): report STOP with evidence, then use
+       session_send(target="<SESSION_ID>", role="user",
+         content="Training health check: STOP. [reason]. Action needed.")
+       to wake up the originating session for follow-up action.
+    4. If clearly fine: report CONTINUE, suggest increasing check interval
+    5. If unsure: report WAIT with the ambiguous signals
+
+    Report format:
+    - Status: STOP / CONTINUE / WAIT
+    - Key metrics (last 10 checkpoints)
+    - Recommendation for next check interval
+
+    If training has completed or the WandB run shows state=finished,
+    report that the training is done and use session_send(target="<SESSION_ID>",
+    role="user", content="Training complete. [summary]") to notify the session,
+    then deactivate this agenda item.
+  """,
+  sessionRefs: [{
+    sessionID: "<current session ID>",
+    hint: "Training setup context, run path, and baseline reference"
+  }]
+)
 ```
 
-As the check interval increases, delete the old CronCreate job and create a new one with the longer interval.
+### Watch Trigger Alternative (for log-file-based monitoring)
+
+If you prefer to fire only when something changes (rather than on a fixed interval), use a watch trigger that polls the training log. The poll command depends on where training runs:
+
+**Remote GPU server** (SSH, requires passwordless login configured):
+```
+command: "ssh <server> 'tail -1 /path/to/training.log'"
+```
+
+**Local machine**:
+```
+command: "tail -1 /path/to/training.log"
+```
+
+**启智平台 (qzcli)**:
+```
+command: "qzcli qz_list_jobs --running-only 2>/dev/null | grep <job-name>"
+```
+
+Full example with a remote server:
+
+```
+agenda_create(
+  title: "Training log watch: <run_id>",
+  triggers: [{
+    type: "watch",
+    watch: {
+      kind: "poll",
+      command: "ssh <server> 'tail -1 /path/to/training.log'",  // or local: "tail -1 /path/to/training.log", or qzcli: "qzcli qz_list_jobs --running-only 2>/dev/null | grep <job-name>"
+      interval: "5m",
+      trigger: "change"        // Fire when the last line changes
+    }
+  }],
+  workDirectory: "<current project directory>",
+  delivery: "auto",
+  prompt: """
+    The training log for <run_id> has new output. Check training health:
+
+    1. Read the last 50 lines of the training log (SSH or local, depending on where training runs)
+    2. Check for: NaN/Inf, loss divergence, abnormal spikes, stalled progress
+    3. Report status: STOP / CONTINUE / WAIT
+    4. If status is STOP, use session_send(target="<SESSION_ID>", role="user",
+       content="Training health check: STOP. [reason]") to wake the originating session.
+    5. If training has completed (final epoch reached), use session_send(target="<SESSION_ID>",
+       role="user", content="Training complete. [summary]"), then deactivate this agenda item.
+
+    Keep the report concise — just status + key numbers.
+  """
+)
+```
+
+### Key Agenda Configuration Details
+
+- **`workDirectory`**: Set to your current project directory so the agenda item runs in the correct scope. This ensures file paths, SSH configs, and WandB references resolve correctly.
+- **`delivery: "auto"`**: Results are sent back to the conversation where you created the agenda item. You'll see the health check reports directly in your current session.
+- **`sessionRefs`**: Attach the current session so the executing agent has context about your training setup, baseline numbers, and what to watch for.
+- **Interval adjustment**: To change the check interval (e.g., from 10m to 30m after consistently healthy reports), use `agenda_update` to modify the trigger. You do NOT need to delete and recreate the item.
+- **Deactivation**: When training completes, the agenda item should be deactivated via `agenda_update(status: "done")` from within the task, or manually via `agenda_update(status: "done")`.
+
+### Important: Delivery Behavior
+
+By default, `delivery: "auto"` sends results as an **assistant** message to your session. This is informational — it does NOT wake up the session's agent to take action. If you want the health check to trigger automated responses (e.g., kill training on NaN detection), you have two options:
+
+1. **Have the agenda task itself take action** — include instructions like "if NaN detected, kill the training process" directly in the agenda prompt. The kill command depends on your platform:
+   - Remote server: `ssh <server> 'kill <pid>'`
+   - Local: `kill <pid>`
+   - 启智平台: `qzcli qz_stop_job --job-id <job-id>`
+2. **Use `session_send` with `role: "user"`** — include in the agenda prompt: "After checking, use `session_send(target: '<your-session-ID>', role: 'user', content: '...')` to wake up this session for follow-up action." This triggers the current session's agent to process the message and respond.

@@ -27,6 +27,49 @@ Autonomously iterate: review → implement fixes → re-review, until the extern
 
 > 💡 Override: `/auto-review-loop "topic" — compact: true, human checkpoint: true, difficulty: hard`
 
+## DAG Orchestration
+
+The review loop is a repeating DAG per round. Below is the structure in `dagwrite` syntax. **Without DAG support, the linear workflow below still works identically** — the DAG is an optional parallelization overlay.
+
+```
+dag auto_review_loop {
+  // ── Round N ──────────────────────────────────────────
+  node round_N_review        { phase: "A"   desc: "Delegate review to reviewer/auditor" }
+  node round_N_parse         { phase: "B"   desc: "Extract score, verdict, action items" }
+  node round_N_memory_update { phase: "B.5" desc: "Update REVIEWER_MEMORY.md"  mode: "hard,nightmare" }
+  node round_N_debate_rebut  { phase: "B.6" desc: "Executor writes rebuttal"   mode: "hard,nightmare" }
+  node round_N_debate_rule   { phase: "B.6" desc: "Reviewer rules on rebuttal" mode: "hard,nightmare" }
+  node round_N_implement     { phase: "C"   desc: "Implement fixes (may fan-out)" }
+  node round_N_wait          { phase: "D"   desc: "Wait for experiment results" }
+  node round_N_document      { phase: "E"   desc: "Append to AUTO_REVIEW.md + write state" }
+
+  // Sequential backbone
+  edge round_N_review  → round_N_parse
+  edge round_N_parse   → round_N_implement
+  edge round_N_implement → round_N_wait
+  edge round_N_wait    → round_N_document
+
+  // hard/nightmare: memory update + debate branch (parallel with each other, after parse)
+  edge round_N_parse         → round_N_memory_update
+  edge round_N_parse         → round_N_debate_rebut
+  edge round_N_memory_update → round_N_debate_rebut   // memory must be saved before debate
+  edge round_N_debate_rebut  → round_N_debate_rule
+  edge round_N_debate_rule   → round_N_implement       // ruling adjusts action items
+
+  // Phase C fan-out: independent fixes run in parallel
+  fanout round_N_implement → [fix_1, fix_2, fix_3]
+  fanin  [fix_1, fix_2, fix_3] → round_N_wait
+
+  // Round boundary
+  edge round_N_document → round_N+1_review
+}
+```
+
+**Parallelization opportunities:**
+- **Phase B.5 + B.6**: In hard/nightmare, memory update (B.5) and debate rebuttal drafting (B.6 step 1) can proceed concurrently — the rebuttal doesn't depend on the memory file being saved first, but the reviewer ruling call (B.6 step 2) must wait for both.
+- **Phase C**: Independent fixes (different files, different experiments) can be dispatched as parallel `task()` calls. Aggregate all results before proceeding to Phase D.
+- **Cross-round**: No parallelism — each round depends on the previous round's documented state.
+
 ## State Persistence (Compact Recovery)
 
 Long-running loops may hit the context window limit, triggering automatic compaction. To survive this, persist state to `review-stage/REVIEW_STATE.json` after each round:
@@ -435,6 +478,83 @@ When loop ends (positive assessment or max rounds):
    - Estimate effort needed for each
    - Suggest whether to continue manually or pivot
 5. **Feishu notification** (if configured): Send `pipeline_done` with final score progression table
+
+## Agenda Integration
+
+For long-running loops, use Synergy's agenda system to avoid blocking on experiment waits and to enable loop continuation across sessions.
+
+### Phase D: Watch-Based Experiment Wait
+
+When experiments launched in Phase C take >30 min, create an agenda item with a **watch trigger** instead of polling manually:
+
+```
+agenda_create(
+  title: "Review loop: wait for experiment results (Round N)",
+  prompt: """
+    The experiment(s) launched in Round N of the auto-review-loop have completed.
+    Results are now available.
+
+    1. Collect all output files and logs from the experiment
+    2. Summarize key results and metrics
+    3. Use session_send to wake up the originating session:
+       session_send(target="<SESSION_ID>", role="user",
+         content="Phase D complete for Round N. Results collected. Resume Phase E.")
+  """,
+  workDirectory: "<current project directory>",
+  delivery: "auto",
+  sessionRefs: [{ sessionID: "<current session ID>", hint: "Active review loop session — resume here after results arrive" }],
+  triggers: [{
+    type: "watch",
+    watch: {
+      kind: "poll",
+      // Choose the right command for your platform:
+      // Remote server:  "ssh <server> 'ls /path/to/results/final_metrics.json 2>/dev/null && echo DONE || echo PENDING'"
+      // Local:         "ls /path/to/results/final_metrics.json 2>/dev/null && echo DONE || echo PENDING"
+      // 启智平台:       "qzcli qz_list_jobs --running-only 2>/dev/null | grep <job-name> || echo DONE"
+      command: "ssh <server> 'ls /path/to/results/final_metrics.json 2>/dev/null && echo DONE || echo PENDING'",
+      interval: "5m",
+      trigger: "match",
+      match: "DONE"
+    }
+  }]
+)
+```
+
+Alternative watch patterns (choose based on your platform):
+- **Screen/tmux session (remote)**: `ssh <server> 'screen -ls | grep <session_name>'` → trigger on match when screen exits
+- **Screen/tmux session (local)**: `screen -ls | grep <session_name>` → trigger on match when screen exits
+- **W&B run status**: `curl -s "https://api.wandb.ai/..." | jq .state` → trigger when state is `"finished"`
+- **启智平台 job**: `qzcli qz_list_jobs --running-only 2>/dev/null | grep <job-name> || echo DONE` → trigger on match "DONE"
+- **Local file**: `{ kind: "file", glob: "results/**/*.json", event: "add" }` → trigger when result files appear
+
+After creating the agenda item, **log it in `review-stage/REVIEW_STATE.json`** under a new `agenda_item_id` field so you can cancel it if the loop is terminated early.
+
+### Loop Continuation After Phase D
+
+The agenda prompt above uses `session_send` with `role: "user"` to **wake up the current session's agent** after results arrive. This is critical:
+
+- `delivery: "auto"` sends the agenda result back as an **assistant** message, which does NOT trigger the session's agent to act
+- `session_send(target, role: "user", content)` delivers a **user** message that wakes the agent, enabling automated continuation to Phase E and the next round
+
+**Full loop continuation pattern:**
+
+```
+// Inside the agenda prompt:
+session_send(
+  target="<SESSION_ID>",
+  role="user",
+  content="Phase D complete for Round N. Results: [summary]. Resume Phase E and continue the review loop."
+)
+```
+
+The session's agent picks up the message, proceeds to Phase E (document round), then loops back to Phase A for the next round — fully automated.
+
+### Key Config Details
+
+- **`workDirectory`**: Must be set to the current project directory for correct scope resolution
+- **`delivery: "auto"`**: Sends the agenda task output back to the originating conversation as an assistant message
+- **`sessionRefs`**: Attach the current session so the agenda task has context about the review loop state
+- **Cleanup**: On loop termination, cancel any outstanding agenda items via `agenda_update(id, status: "cancelled")`
 
 ## Key Rules
 

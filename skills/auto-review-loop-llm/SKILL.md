@@ -80,6 +80,43 @@ curl -s "${LLM_BASE_URL}/chat/completions" \
   }'
 ```
 
+## DAG Orchestration
+
+The review loop is a repeating subgraph where each round is a linear chain of phases, with potential parallelism inside Phase C.
+
+```
+┌─────────────────────────── Loop: round_1 .. round_N ───────────────────────────┐
+│                                                                                 │
+│  ┌──────────┐    ┌──────────┐    ┌──────────────┐    ┌──────┐    ┌──────────┐  │
+│  │ Phase A  │───▶│ Phase B  │───▶│   Phase C    │───▶│Phase │───▶│ Phase E  │  │
+│  │ Review   │    │ Parse    │    │  Implement   │    │  D   │    │ Document │  │
+│  │ (LLM)    │    │Assessment│    │   Fixes      │    │Wait  │    │ Round    │  │
+│  └──────────┘    └──────────┘    └──────────────┘    └──────┘    └──────────┘  │
+│                                        │                                        │
+│                          ┌─────────────┼─────────────┐                          │
+│                          ▼             ▼             ▼                          │
+│                    ┌──────────┐  ┌──────────┐  ┌──────────┐                     │
+│                    │ Fix #1   │  │ Fix #2   │  │ Fix #3   │  (parallelizable)   │
+│                    │(indep.)  │  │(indep.)  │  │(indep.)  │                     │
+│                    └────┬─────┘  └────┬─────┘  └────┬─────┘                     │
+│                         └─────────────┼─────────────┘                          │
+│                                       ▼                                        │
+│                                 (join / sync)                                  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+round_N ──▶ [if score < 6 or verdict ≠ ready] ──▶ round_N+1
+         ──▶ [if score ≥ 6 and verdict = ready] ──▶ Termination
+```
+
+- **Phase A → B**: strictly sequential (B depends on A's output)
+- **Phase C**: independent fixes within the same round can run in parallel; fixes with dependencies (e.g., "add metric" before "re-run ablation") must be ordered
+- **Phase C → D**: sequential (D waits for all C fixes to complete or launch)
+- **Phase D → E**: sequential (E needs D's results)
+- **Round boundary**: E writes `REVIEW_STATE.json`, then B's stop-check gates the next round
+
+> **Note**: Without DAG support, the linear workflow below still works identically — phases execute sequentially within each round.
+
 ## State Persistence (Compact Recovery)
 
 Persist state to `review-stage/REVIEW_STATE.json` after each round:
@@ -198,6 +235,107 @@ Append to `review-stage/AUTO_REVIEW.md`:
 
 1. Set `review-stage/REVIEW_STATE.json` status to "completed"
 2. Write final summary
+
+## Agenda Integration
+
+The review loop can take hours across multiple rounds. Use agenda items for automated monitoring and continuation instead of manual polling.
+
+### Phase D: Watch Triggers for Experiment Results
+
+When Phase D launches long-running experiments, set a watch trigger to detect result readiness. Choose the pattern that matches your platform:
+
+**Local results (file watch):**
+```
+triggers:
+  - type: "watch"
+    watch:
+      kind: "file"
+      glob: "results/**/metrics.json"
+      event: "add"
+```
+
+**Remote GPU server (SSH poll, requires passwordless login):**
+```
+triggers:
+  - type: "watch"
+    watch:
+      kind: "poll"
+      command: "ssh <server> 'ls /path/to/results/final_metrics.json 2>/dev/null && echo DONE || echo PENDING'"
+      interval: "5m"
+      trigger: "match"
+      match: "DONE"
+```
+
+**启智平台 (qzcli poll):**
+```
+triggers:
+  - type: "watch"
+    watch:
+      kind: "poll"
+      command: "qzcli qz_list_jobs --running-only 2>/dev/null | grep <job-name> || echo DONE"
+      interval: "5m"
+      trigger: "match"
+      match: "DONE"
+```
+
+Full example using local file watch:
+
+```
+agenda_create:
+  title: "Watch experiment results for review loop"
+  triggers:
+    - type: "watch"
+      watch:
+        kind: "file"
+        glob: "results/**/metrics.json"
+        event: "add"
+  workDirectory: "<current project directory>"
+  delivery: "auto"
+  sessionRefs:
+    - sessionID: "<current-session-id>"
+      hint: "Review loop in progress — check REVIEW_STATE.json for round context"
+  prompt: |
+    An experiment result file was created. Check review-stage/REVIEW_STATE.json
+    for current loop state. If Phase D is active and results are ready,
+    use session_send to continue the loop:
+      session_send(target: "<session-ID>", role: "user",
+        content: "Experiment results are ready. Continue review loop — proceed to Phase E.")
+```
+
+### Long Loop Monitoring
+
+For the full loop (up to 4 rounds), create a periodic check that inspects `REVIEW_STATE.json`:
+
+```
+agenda_create:
+  title: "Monitor review loop progress"
+  triggers:
+    - type: "every"
+      interval: "30m"
+  workDirectory: "<current project directory>"
+  delivery: "auto"
+  sessionRefs:
+    - sessionID: "<current-session-id>"
+      hint: "Active review loop — this session contains the full loop context"
+  prompt: |
+    Check review-stage/REVIEW_STATE.json. Report status:
+    - If status is "completed": loop finished, no action needed.
+    - If status is "in_progress" and last timestamp is > 2h old:
+      the loop may be stalled. Use session_send to wake the session:
+        session_send(target: "<session-ID>", role: "user",
+          content: "Review loop appears stalled. Check REVIEW_STATE.json and continue from last checkpoint.")
+    - Otherwise: loop is progressing, no action needed.
+```
+
+### Key Config Details
+
+| Field | Value | Reason |
+|-------|-------|--------|
+| `workDirectory` | Current project dir | Correct scope for file access |
+| `delivery` | `"auto"` | Sends results back to originating conversation |
+| `sessionRefs` | Current session ID + hint | Provides loop context to the triggered agent |
+
+**Important**: `delivery: "auto"` delivers as **assistant** role, which does **not** wake the session's agent. To trigger automated continuation, use `session_send(target: "<session-ID>", role: "user", content: "...")` inside the agenda prompt. A user-role message wakes the target session's agent, enabling hands-free loop continuation.
 
 ## Key Rules
 

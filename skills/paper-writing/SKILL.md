@@ -50,18 +50,38 @@ When running in Synergy, this pipeline benefits from DAG-based task tracking. Fi
 
 ```
 dagwrite({ nodes: [
-  { id: "plan",        content: "Create paper outline via /paper-plan",                 status: "pending", deps: [] },
-  { id: "figures",     content: "Generate data plots via /paper-figure",                status: "pending", deps: ["plan"] },
-  { id: "illustrate",  content: "Generate architecture diagrams via /figure-spec",      status: "pending", deps: ["plan"] },
-  { id: "write",       content: "Write LaTeX sections via /paper-write",                status: "pending", deps: ["figures", "illustrate"] },
-  { id: "compile",     content: "Compile PDF via /paper-compile",                       status: "pending", deps: ["write"] },
-  { id: "proof-check", content: "Verify proofs via /proof-checker (if applicable)",     status: "pending", deps: ["compile"] },
-  { id: "claim-audit", content: "Audit claims via /paper-claim-audit (if applicable)",  status: "pending", deps: ["compile"] },
-  { id: "improve",     content: "Polish via /auto-paper-improvement-loop",              status: "pending", deps: ["proof-check", "claim-audit"] }
+  { id: "plan",              content: "Create paper outline via /paper-plan",                     status: "pending", deps: [] },
+  { id: "figures",           content: "Generate data plots via /paper-figure",                    status: "pending", deps: ["plan"] },
+  { id: "illustrate",        content: "Generate architecture diagrams via /figure-spec",          status: "pending", deps: ["plan"] },
+  { id: "write",             content: "Write LaTeX sections via /paper-write",                    status: "pending", deps: ["figures", "illustrate"] },
+  { id: "compile",           content: "Compile PDF via /paper-compile",                           status: "pending", deps: ["write"] },
+  { id: "proof-check",       content: "Verify proofs via /proof-checker (if applicable)",         status: "pending", deps: ["compile"] },
+  { id: "claim-audit",       content: "Audit claims via /paper-claim-audit (if applicable)",      status: "pending", deps: ["compile"] },
+  { id: "improve",           content: "Polish via /auto-paper-improvement-loop",                  status: "pending", deps: ["proof-check", "claim-audit"] },
+
+  // Phase 5 sub-DAG: improvement loop internal rounds
+  // (auto-managed by /auto-paper-improvement-loop, shown for reference)
+  { id: "review_r1",         content: "[Phase 5] Round 1: reviewer agent reviews full paper",     status: "pending", deps: ["improve"] },
+  { id: "fix_r1",            content: "[Phase 5] Round 1: executor implements fixes",             status: "pending", deps: ["review_r1"] },
+  { id: "compile_r1",        content: "[Phase 5] Round 1: recompile → main_round1.pdf",          status: "pending", deps: ["fix_r1"] },
+  { id: "review_r2",         content: "[Phase 5] Round 2: reviewer re-reviews with context",      status: "pending", deps: ["compile_r1"] },
+  { id: "fix_r2",            content: "[Phase 5] Round 2: executor implements remaining fixes",   status: "pending", deps: ["review_r2"] },
+  { id: "compile_r2",        content: "[Phase 5] Round 2: recompile → main_round2.pdf",          status: "pending", deps: ["fix_r2"] },
+
+  // Post-improvement gates
+  { id: "final-claim-audit", content: "Final paper-claim-audit (mandatory submission gate)",      status: "pending", deps: ["compile_r2"] },
+  { id: "report",            content: "Generate final pipeline report",                           status: "pending", deps: ["final-claim-audit"] }
 ]})
 ```
 
-The `figures` and `illustrate` nodes fan out in parallel after `plan`, then converge before writing. Similarly, `proof-check` and `claim-audit` run in parallel before the improvement loop. If running without DAG support, the linear workflow below still works identically.
+**Parallelism patterns:**
+- `figures` and `illustrate` fan out after `plan`, converge before `write`
+- `proof-check` and `claim-audit` run in parallel after `compile`
+- The improvement loop (`improve` → review/fix/compile × 2) is a **sub-DAG**: a linear chain of round-internal steps that the `/auto-paper-improvement-loop` skill manages internally. The sub-DAG nodes above are for visibility and progress tracking; the skill itself orchestrates the review→fix→recompile cycle.
+
+**Sub-DAG pattern for improvement rounds:** Each round follows `review → fix → recompile`, forming a sequential chain within the loop. Round N+1 depends on round N's compilation. This pattern generalizes: if `MAX_IMPROVEMENT_ROUNDS` is increased, extend the chain with additional `{review, fix, compile}_rN` nodes.
+
+If running without DAG support, the linear workflow below still works identically.
 
 ## Pipeline
 
@@ -378,6 +398,51 @@ fi
 > - **[Output Versioning Protocol](../shared-references/output-versioning.md)** — write timestamped file first, then copy to fixed name
 > - **[Output Manifest Protocol](../shared-references/output-manifest.md)** — log every output to MANIFEST.md
 > - **[Output Language Protocol](../shared-references/output-language.md)** — note: paper-writing always outputs English LaTeX for venue submission
+
+## Agenda Integration
+
+Phases 3 and 5 can take 15-30 min each and allow sleeping. Use Synergy's agenda system to monitor long-running phases and resume automatically when they complete.
+
+### Phase 3 (LaTeX Writing) — completion watch
+
+If writing is delegated to a `task()`, an agenda watch trigger can detect when the task finishes and notify the originating session:
+
+```
+agenda_create({
+  title: "Monitor Phase 3 writing completion",
+  triggers: [{ type: "watch", watch: {
+    kind: "file", glob: "paper/main.tex", event: "change",
+    debounce: "5s"
+  }}],
+  workDirectory: "<current project directory>",
+  delivery: "auto",
+  sessionRefs: [{ sessionID: "<current session ID>", hint: "Phase 3 writing in progress" }],
+  prompt: "Phase 3 LaTeX writing appears to have produced output. Check if /paper-write has completed successfully by verifying that paper/main.tex and all section files exist. If complete, use session_send to send a user message to the originating session saying 'Phase 3 writing complete, ready for Phase 4 compilation.' so the agent continues the pipeline."
+})
+```
+
+### Phase 5 (Improvement Loop) — periodic progress check
+
+The improvement loop runs 2 rounds of review→fix→recompile (15-30 min). Use an `every` trigger to poll for completion:
+
+```
+agenda_create({
+  title: "Monitor Phase 5 improvement loop",
+  triggers: [{ type: "every", interval: "5m" }],
+  workDirectory: "<current project directory>",
+  delivery: "auto",
+  sessionRefs: [{ sessionID: "<current session ID>", hint: "Phase 5 improvement loop running" }],
+  prompt: "Check if the improvement loop has completed by looking for PAPER_IMPROVEMENT_LOG.md and verifying main_round2.pdf exists. If the loop is still running, report brief status and stop. If complete, use session_send with role 'user' to the originating session with: 'Phase 5 improvement loop complete. Scores: [read from log]. Ready for final claim audit.' — then update this agenda item status to 'done' to stop further polling."
+})
+```
+
+### Key config details
+
+- **`workDirectory`**: must be set to the current project directory so the agenda item executes in the correct scope (resolves config, skills, and file paths properly).
+- **`delivery: "auto"`**: sends results back to the originating conversation as an **assistant** message. This does NOT wake the session's agent — the message is delivered but no automated response is triggered.
+- **Triggering automated continuation**: To make the originating session's agent actually resume the pipeline, use `session_send(target: "<session-ID>", role: "user", content: "...")` inside the agenda prompt. The `role: "user"` is critical — it causes the session's agent to process the message and continue autonomously.
+- **`sessionRefs`**: attach the current session so the agenda's executor has context about what was happening when the item was created.
+- **Self-terminating polls**: For `every` triggers, the prompt should check completion and set status to `"done"` (via `agenda_update`) when finished, to avoid indefinite polling.
 
 ## Key Rules
 

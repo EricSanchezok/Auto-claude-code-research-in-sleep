@@ -24,6 +24,50 @@ Unlike `/auto-review-loop` (which iterates on **research** — running experimen
 
 > 💡 Override: `/auto-paper-improvement-loop "paper/" — human checkpoint: true`
 
+## DAG Orchestration
+
+When DAG execution is available, the workflow decomposes into the following dependency graph:
+
+```
+review_r1 ──→ implement_r1 ──→ recompile_r1 ──→ regression_test_r1
+                                                        │
+                                                        ▼
+review_r2 ──→ implement_r2 ──→ recompile_r2 ──→ regression_test_r2
+                   ▲              │                       │
+                   │              ▼                       ▼
+           [kill_attack ──┐   format_check ──→ document_results
+            kill_defense] ┘
+              (parallel)      └── merge into implement_r2 (theory papers only)
+```
+
+**Node definitions:**
+
+| Node | Maps to | Parallelism |
+|------|---------|-------------|
+| `review_r1` | Step 2 | Single `task()` |
+| `implement_r1` | Step 3 | CRITICAL + MAJOR fixes via parallel `task()` calls; MINOR sequential |
+| `recompile_r1` | Step 4 | Sequential (latexmk) |
+| `regression_test_r1` | Step 4.5 | Sequential (python3) |
+| `review_r2` | Step 5 | Single `task()` |
+| `kill_attack` | Step 5.5 Thread 1 | Parallel with `kill_defense` |
+| `kill_defense` | Step 5.5 Thread 2 | Parallel with `kill_attack` |
+| `implement_r2` | Step 6 | Same as `implement_r1`; also receives merged kill-argument findings |
+| `recompile_r2` | Step 7 | Sequential |
+| `regression_test_r2` | Step 4.5 (second run) | Sequential |
+| `format_check` | Step 8 | Sequential |
+| `document_results` | Step 9 | Sequential |
+
+**Edges (dependencies):**
+- `review_r1 → implement_r1 → recompile_r1 → regression_test_r1` (Round 1 chain)
+- `regression_test_r1 → review_r2` (Round 1 must complete before Round 2 starts)
+- `review_r2 → implement_r2`, `review_r2 → kill_attack`, `review_r2 → kill_defense` (Round 2 review fans out)
+- `kill_attack + kill_defense → implement_r2` (kill-argument findings merge into fixes; theory papers only)
+- `implement_r2 → recompile_r2 → regression_test_r2 → format_check → document_results`
+
+**Within implement nodes:** CRITICAL and MAJOR fixes targeting independent `.tex` files can execute via parallel `task()` calls. Fixes with cross-file implications (e.g., notation rename) must be sequential.
+
+> **Note:** Without DAG support, the linear workflow below still works identically — each step runs to completion before the next.
+
 ## Inputs
 
 1. **Compiled paper** — `paper/main.pdf` + LaTeX source files
@@ -433,6 +477,61 @@ paper/
 ├── main.pdf                    # = main_round2.pdf
 └── PAPER_IMPROVEMENT_LOG.md    # Full review log with scores
 ```
+
+## Agenda Integration
+
+The 2-round improvement loop runs for 15–30 minutes. Agenda items can monitor progress and handle long compilation waits without blocking the session.
+
+### Long compilation waits
+
+If `latexmk` errors require multiple fix cycles, an agenda watch item can poll for compilation success:
+
+```
+agenda_create(
+  title: "Watch latexmk completion",
+  triggers: [{ type: "every", interval: "2m" }],
+  prompt: """
+    Check if paper/main.pdf was modified in the last 3 minutes (ls -lt paper/main.pdf).
+    If it was, read the last 20 lines of paper/main.log for errors.
+    If 0 errors, use session_send(target="<this-session>", role="user",
+      content="Compilation successful. Resuming improvement loop.") to wake the originating session.
+    If errors remain, report the error count.
+    Do NOT attempt fixes — just report status.
+  """,
+  delivery: "auto",
+  workDirectory: "<current-project-dir>",
+  sessionRefs: [{ sessionID: "<this-session>" }]
+)
+```
+
+### Improvement loop monitoring
+
+Monitor the full loop by watching `PAPER_IMPROVEMENT_STATE.json`:
+
+```
+agenda_create(
+  title: "Monitor paper improvement loop",
+  triggers: [{ type: "every", interval: "5m" }],
+  prompt: """
+    Read PAPER_IMPROVEMENT_STATE.json in the paper directory.
+    Report: current_round, last_score, status, and timestamp.
+    If status is "completed", read PAPER_IMPROVEMENT_LOG.md and send a summary
+    via session_send(target: "<this-session>", role: "user", content: "Paper improvement complete. Score: ...")
+    then set this agenda item status to "done".
+    If status is "in_progress" and timestamp is older than 1 hour, warn about possible stall.
+  """,
+  delivery: "auto",
+  workDirectory: "<current-project-dir>",
+  sessionRefs: [{ sessionID: "<this-session>" }]
+)
+```
+
+### Key config details
+
+- **`workDirectory`**: Must be set to the current project directory so the agenda item executes in the correct scope.
+- **`delivery: "auto"`**: Sends results back to the originating conversation as an **assistant** message. This does NOT wake up the session's agent — it is informational only.
+- **Triggering automated continuation**: To make the session's agent act on a monitoring result (e.g., resume after stall, proceed after compilation), use `session_send(target: "<session-ID>", role: "user", content: "...")` inside the agenda prompt. The `"user"` role triggers the agent to process the message.
+- **`sessionRefs`**: Attach the current session so the agenda item has context about what it is monitoring.
 
 ## Key Rules
 

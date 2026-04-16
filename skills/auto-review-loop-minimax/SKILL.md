@@ -56,6 +56,38 @@ curl -s "https://api.minimax.io/v1/chat/completions" \
 
 **Why MiniMax?** MiniMax provides an alternative review backend via its OpenAI-compatible API, useful when you want a different model perspective for external review.
 
+## DAG Orchestration
+
+The review loop has a natural DAG structure. When a DAG executor is available, phases can be scheduled as nodes with dependencies; otherwise the linear workflow below works identically.
+
+```
+round_1 ──► round_2 ──► ... ──► round_N
+  │            │                    │
+  ▼            ▼                    ▼
+ (subgraph)  (subgraph)          (subgraph)
+```
+
+Each round subgraph:
+
+```
+review ──► parse ──► implement ──► wait ──► document
+                         │
+                    ┌────┼────┐
+                    ▼    ▼    ▼
+                  fix_1 fix_2 fix_3   ← independent fixes can parallelize
+                    │    │    │
+                    └────┼────┘
+                         ▼
+                    (merge & continue)
+```
+
+- **Edges**: `review → parse → implement → wait → document` (sequential within a round)
+- **Phase C parallelism**: Independent fixes (e.g., code edits vs. metric additions vs. documentation) fan out and merge back before Phase D
+- **Round boundary**: `document_N → review_{N+1}` (next round cannot start until current round is documented)
+- **Early exit**: If `parse` yields a positive assessment, skip `implement`/`wait` and go directly to termination
+
+> Without DAG support, the linear workflow below still works identically — this section is purely informational for DAG-aware orchestrators.
+
 ## State Persistence (Compact Recovery)
 
 Long-running loops may hit the context window limit, triggering automatic compaction. To survive this, persist state to `review-stage/REVIEW_STATE.json` after each round:
@@ -213,6 +245,95 @@ When loop ends (positive assessment or max rounds):
    - List remaining blockers
    - Estimate effort needed for each
    - Suggest whether to continue manually or pivot
+
+## Agenda Integration
+
+The review loop can run for hours across multiple rounds. Agenda items enable automated monitoring and continuation without manual polling.
+
+### Phase D: Watch Triggers for Experiment Results
+
+When experiments are launched in Phase C, use an agenda watch trigger to detect result readiness. Choose the pattern that matches your platform:
+
+**Local results (file watch):**
+```
+triggers:
+  - type: watch
+    watch:
+      kind: file
+      glob: "results/**/*.done"    # sentinel file written by experiment script
+      event: add
+```
+
+**Local results (poll):**
+```
+triggers:
+  - type: watch
+    watch:
+      kind: poll
+      command: "test -f results/experiment.done && echo DONE || echo PENDING"
+      interval: "5m"
+      trigger: match
+      match: "DONE"
+```
+
+**Remote GPU server (SSH poll, requires passwordless login):**
+```
+triggers:
+  - type: watch
+    watch:
+      kind: poll
+      command: "ssh <server> 'ls /path/to/results/final_metrics.json 2>/dev/null && echo DONE || echo PENDING'"
+      interval: "5m"
+      trigger: match
+      match: "DONE"
+```
+
+**启智平台 (qzcli poll):**
+```
+triggers:
+  - type: watch
+    watch:
+      kind: poll
+      command: "qzcli qz_list_jobs --running-only 2>/dev/null | grep <job-name> || echo DONE"
+      interval: "5m"
+      trigger: match
+      match: "DONE"
+```
+
+### Long Loop Monitoring
+
+Set a periodic check on `REVIEW_STATE.json` to monitor overall progress and resume if the agent session stalls:
+
+```
+agenda_create:
+  title: "Monitor review loop progress"
+  triggers:
+    - type: every
+      interval: "30m"
+  workDirectory: "<current project directory>"
+  delivery: "auto"
+  sessionRefs:
+    - sessionID: "<current-session-id>"
+      hint: "Review loop state and recent round context"
+  prompt: |
+    Check review-stage/REVIEW_STATE.json. If status is "completed", 
+    report the final score and cancel this agenda item. If status is 
+    "in_progress" and the timestamp is stale (>1h old without a new round), 
+    send a user message to the session to resume the loop:
+    
+    session_send(
+      target: "<current-session-id>",
+      role: "user",
+      content: "Review loop appears stalled. Check REVIEW_STATE.json and resume from the last completed round."
+    )
+```
+
+### Key Configuration Details
+
+- **`workDirectory`**: Must be set to the current project directory so the agenda prompt resolves the correct scope for file access
+- **`delivery: "auto"`**: Sends results back to the originating conversation as an **assistant** message — this does NOT wake the session's agent
+- **Waking the agent**: To trigger automated continuation, use `session_send(target: "<session-ID>", role: "user", content: "...")` inside the agenda prompt. A user-role message wakes the session's agent to process and respond
+- **`sessionRefs`**: Attach the current session so the agenda prompt has context about what the loop is working on
 
 ## Key Rules
 
