@@ -2,7 +2,7 @@
 name: grant-proposal
 description: "Draft a structured grant proposal from research ideas and literature. Supports KAKENHI (Japan), NSF (US), NSFC (China, including 面上/青年/优青/杰青/海外优青/重点), ERC (EU), DFG (Germany), SNSF (Switzerland), ARC (Australia), NWO (Netherlands), and generic formats. Use when user says \"write grant\", \"grant proposal\", \"申請書\", \"write KAKENHI\", \"科研費\", \"基金申请\", \"写基金\", \"NSF proposal\", or wants to turn research ideas into a funding application."
 argument-hint: [research-direction — grant-type]
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Agent, Skill, Task
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Skill, Task
 ---
 
 # Grant Proposal: From Research Ideas to Fundable Application
@@ -431,7 +431,7 @@ If `/research-review` is invoked (preferred), it handles the reviewer call inter
 #### Round 1 (full draft review):
 
 ```
-task(subagent_type="reviewer"):
+task(subagent_type="reviewer", category="most-capable"):
   prompt: |
     Review this complete [GRANT_TYPE] [GRANT_SUBTYPE] proposal draft.
 
@@ -458,7 +458,7 @@ task(subagent_type="reviewer"):
 If MAX_REVIEW_ROUNDS > 1 and revisions were applied:
 
 ```
-task(subagent_type="reviewer"):
+task(subagent_type="reviewer", category="most-capable"):
   prompt: |
     [Round N review of revised [GRANT_TYPE] [GRANT_SUBTYPE] proposal]
 

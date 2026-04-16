@@ -2,7 +2,7 @@
 name: auto-review-loop
 description: Autonomous multi-round research review loop. Repeatedly reviews, implements fixes, and re-reviews until positive assessment or max rounds reached. Use when user says "auto review loop", "review until it passes", or wants autonomous iterative improvement.
 argument-hint: [topic-or-scope]
-allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Agent, Skill, Task
+allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Skill, Task
 ---
 
 # Auto Review Loop: Autonomous Research Improvement
@@ -23,7 +23,7 @@ Autonomously iterate: review → implement fixes → re-review, until the extern
 - **REVIEWER_DIFFICULTY = medium** — Controls how adversarial the reviewer is. Three levels:
   - `medium` (default): Current behavior — the executor delegates review to a reviewer agent via `task()`.
   - `hard`: Adds **Reviewer Memory** (the reviewer tracks its own suspicions across rounds) + **Debate Protocol** (the executor can rebut, the reviewer rules).
-  - `nightmare`: Everything in `hard` + **the reviewer reads the repo directly** via `task(subagent_type="auditor")` (the executor cannot filter what the reviewer sees) + **Adversarial Verification** (the reviewer independently checks if code matches claims).
+  - `nightmare`: Everything in `hard` + **the reviewer reads the repo directly** via `task(subagent_type="auditor", category="most-capable")` (the executor cannot filter what the reviewer sees) + **Adversarial Verification** (the reviewer independently checks if code matches claims).
 
 > 💡 Override: `/auto-review-loop "topic" — compact: true, human checkpoint: true, difficulty: hard`
 
@@ -80,13 +80,14 @@ Long-running loops may hit the context window limit, triggering automatic compac
 
 **Route by REVIEWER_DIFFICULTY:**
 
-##### Medium (default) — Reviewer Agent
+##### Medium (default) — Reviewer Task
 
 Send comprehensive context to the external reviewer:
 
 ```
 task(
   subagent_type="reviewer",
+  category="most-capable",
   prompt="""
     [Round N/MAX_ROUNDS of autonomous review loop]
 
@@ -107,13 +108,14 @@ task(
 
 For round 2+, include the full context of prior reviews and changes directly in the prompt — each `task()` call is stateless.
 
-##### Hard — Reviewer Agent + Reviewer Memory
+##### Hard — Reviewer Task + Reviewer Memory
 
 Same as medium, but **prepend Reviewer Memory** to the prompt:
 
 ```
 task(
   subagent_type="reviewer",
+  category="most-capable",
   prompt="""
     [Round N/MAX_ROUNDS of autonomous review loop]
 
@@ -140,13 +142,14 @@ task(
 )
 ```
 
-##### Nightmare — Auditor Agent (reviewer reads repo directly)
+##### Nightmare — Auditor Task (reviewer reads repo directly)
 
 **Do NOT use the standard reviewer.** Instead, let the reviewer access the repo autonomously via an auditor agent:
 
 ```
 task(
   subagent_type="auditor",
+  category="most-capable",
   prompt="""
     You are an adversarial senior ML reviewer (NeurIPS/ICML level).
     This is Round N/MAX_ROUNDS of an autonomous review loop.
@@ -248,6 +251,7 @@ Send the executor's rebuttal back to the reviewer for a ruling:
 ```
 task(
   subagent_type="reviewer",
+  category="most-capable",
   prompt="""
     You are a senior ML reviewer. The author rebuts your review:
 
@@ -269,6 +273,7 @@ task(
 ```
 task(
   subagent_type="auditor",
+  category="most-capable",
   prompt="""
     You are the same adversarial reviewer. The author rebuts your review:
 
@@ -451,6 +456,7 @@ Since each `task()` call is stateless, include the full context of prior reviews
 ```
 task(
   subagent_type="reviewer",
+  category="most-capable",
   prompt="""
     [Round N/MAX_ROUNDS of autonomous review loop]
 
@@ -475,4 +481,4 @@ task(
 
 ## Review Tracing
 
-After each `task(subagent_type="reviewer")` or `task(subagent_type="auditor")` call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).
+After each `task(subagent_type="reviewer", category="most-capable")` or `task(subagent_type="auditor", category="most-capable")` call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).

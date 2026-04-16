@@ -30,7 +30,7 @@ The executor reads available project files to build the full picture:
 ### Step 2: Reviewer Designs Ablations
 
 ```
-task(subagent_type="reviewer"):
+task(subagent_type="reviewer", category="most-capable"):
   prompt: |
     You are a rigorous ML reviewer planning ablation studies.
     Given this method and results, design ablations that:

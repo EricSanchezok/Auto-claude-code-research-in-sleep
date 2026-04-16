@@ -2,7 +2,7 @@
 name: paper-slides
 description: "Generate conference presentation slides (beamer LaTeX → PDF + editable PPTX) from a compiled paper, with speaker notes and full talk script. Use when user says \"做PPT\", \"做幻灯片\", \"make slides\", \"conference talk\", \"presentation slides\", \"生成slides\", \"写演讲稿\", or wants beamer slides for a conference talk."
 argument-hint: [paper-directory-or-talk-length]
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, Task
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Task
 ---
 
 # Paper Slides: From Paper to Conference Talk
@@ -313,12 +313,12 @@ If page count differs significantly from outline (>2 slides off), investigate.
 
 **State**: Write `SLIDES_STATE.json` with `phase: 4`.
 
-### Phase 5: Reviewer Agent Review
+### Phase 5: Reviewer Task Review
 
 Send the slide outline + selected LaTeX frames to the reviewer agent (category: most-capable):
 
 ```
-task(subagent_type="reviewer"):
+task(subagent_type="reviewer", category="most-capable"):
   prompt: |
     Review this [TALK_TYPE] presentation ([TALK_MINUTES] min) for [VENUE].
 

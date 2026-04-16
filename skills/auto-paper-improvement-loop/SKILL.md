@@ -2,7 +2,7 @@
 name: auto-paper-improvement-loop
 description: "Autonomously improve a generated paper via external review → implement fixes → recompile, for 2 rounds. Use when user says \"改论文\", \"improve paper\", \"论文润色循环\", \"auto improve\", or wants to iteratively polish a generated paper."
 argument-hint: [paper-directory]
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, Task
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Task
 ---
 
 # Auto Paper Improvement Loop: Review → Fix → Recompile
@@ -85,6 +85,7 @@ Send the full paper text AND compiled PDF to the reviewer agent:
 ```
 task(
   subagent_type="reviewer",
+  category="most-capable",
   prompt="""
     You are reviewing a [VENUE] paper. Please provide a detailed, structured review.
 
@@ -211,6 +212,7 @@ If `REVIEWER_BIAS_GUARD = true` (default), use a **fresh** `task()` call for Rou
 ```
 task(
   subagent_type="reviewer",
+  category="most-capable",
   prompt="""
     You are reviewing a [VENUE] paper. This is a fresh, zero-context review.
     Ignore any prior review rounds, prior fix lists, or executor explanations.
@@ -459,4 +461,4 @@ Based on end-to-end testing on a 9-page ICLR 2026 theory paper:
 
 ## Review Tracing
 
-After each `task(subagent_type="reviewer")` call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).
+After each `task(subagent_type="reviewer", category="most-capable")` call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).

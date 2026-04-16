@@ -2,7 +2,7 @@
 name: paper-compile
 description: "Compile LaTeX paper to PDF, fix errors, and verify output. Use when user says \"编译论文\", \"compile paper\", \"build PDF\", \"生成PDF\", or wants to compile LaTeX into a submission-ready PDF."
 argument-hint: [paper-directory]
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Task
 ---
 
 # Paper Compile: LaTeX to Submission-Ready PDF
@@ -120,7 +120,7 @@ For each error:
 3. Apply the fix
 4. Recompile
 
-**Stuck after 2 attempts?** Try delegating to a reviewer agent via `task(subagent_type="reviewer")` — the reviewer can independently read the LaTeX source and `compile.log` to spot issues the executor missed (e.g., conflicting packages, encoding problems, subtle macro errors). If unavailable, continue with the executor's own diagnosis.
+**Stuck after 2 attempts?** Try delegating to a master agent via `task(subagent_type="master", category="general")` — the master can independently read the LaTeX source and `compile.log` to spot issues the executor missed (e.g., conflicting packages, encoding problems, subtle macro errors). If unavailable, continue with the executor's own diagnosis.
 
 ### Step 5: Post-Compilation Checks
 

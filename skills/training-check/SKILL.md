@@ -64,7 +64,7 @@ Check these signals:
 Only escalate to the reviewer when the signal is ambiguous. For clearly good or clearly bad signals, act directly.
 
 ```
-task(subagent_type="reviewer"):
+task(subagent_type="reviewer", category="most-capable"):
   prompt: |
     TRAINING HEALTH CHECK — need your judgment on ambiguous metrics.
 

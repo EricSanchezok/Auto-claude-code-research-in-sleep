@@ -2,7 +2,7 @@
 name: paper-poster
 description: "Generate a conference poster (article + tcbposter LaTeX → A0/A1 PDF + editable PPTX + SVG) from a compiled paper. Use when user says \"做海报\", \"制作海报\", \"conference poster\", \"make poster\", \"生成poster\", \"poster session\", or wants to create a poster for a conference presentation."
 argument-hint: [paper-directory-or-venue]
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, Task
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Task
 ---
 
 # Paper Poster: From Paper to Conference Poster
@@ -758,12 +758,12 @@ Append all iteration scores and feedback to `poster/POSTER_VISUAL_REVIEW.md`:
 - Decision: PASS — print-ready
 ```
 
-### Phase 6: Reviewer Agent Review
+### Phase 6: Reviewer Task Review
 
 Send the poster content plan + key LaTeX sections to the reviewer agent (category: most-capable) for review.
 
 ```
-task(subagent_type="reviewer"):
+task(subagent_type="reviewer", category="most-capable"):
   prompt: |
     Review this academic conference poster for [VENUE].
 

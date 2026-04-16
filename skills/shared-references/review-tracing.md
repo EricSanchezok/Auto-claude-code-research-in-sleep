@@ -9,7 +9,7 @@ Save full prompt/response pairs for every reviewer agent call, enabling:
 
 ## When to Trace
 
-After **every** `task(subagent_type="reviewer")` or `task(subagent_type="auditor")` call that serves a reviewer/critique function. This includes review scoring, experiment auditing, claim verification, idea critique, and patch gating.
+After **every** `task(subagent_type="reviewer", category="most-capable")` or `task(subagent_type="auditor", category="most-capable")` call that serves a reviewer/critique function. This includes review scoring, experiment auditing, claim verification, idea critique, and patch gating.
 
 Do NOT trace: purely informational task calls (e.g., implementation tasks that are not reviews).
 

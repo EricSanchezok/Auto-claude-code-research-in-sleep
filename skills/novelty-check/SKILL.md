@@ -41,9 +41,9 @@ For EACH core claim, search using ALL available sources:
 3. **Read abstracts**: For each potentially overlapping paper, WebFetch its abstract and related work section
 
 ### Phase C: Cross-Model Verification
-Call the reviewer agent via task() delegation:
+Call the scholar agent via task() delegation:
 ```
-task(subagent_type="reviewer"):
+task(subagent_type="scholar", category="general"):
   prompt: |
     [The proposed method description]
     [All papers found in Phase B]
@@ -87,4 +87,4 @@ Output a structured report:
 
 ## Review Tracing
 
-After each `task(subagent_type="reviewer")` call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).
+After each `task(subagent_type="scholar")` call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).

@@ -2,10 +2,10 @@
 name: research-review
 description: Get a deep critical review of research. Use when user says "review my research", "help me review", "get external review", or wants critical feedback on research ideas, papers, or experimental results.
 argument-hint: [topic-or-scope]
-allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Agent, Task
+allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Task
 ---
 
-# Research Review via Reviewer Agent
+# Research Review via Reviewer Task
 
 Get a multi-round critical review of research work from an external reviewer agent with maximum reasoning depth.
 
@@ -29,6 +29,7 @@ Send a detailed prompt to the reviewer agent:
 ```
 task(
   subagent_type="reviewer",
+  category="most-capable",
   prompt="""
     [Full research context + specific questions]
     Please act as a senior ML reviewer (NeurIPS/ICML level). Identify:
@@ -99,4 +100,4 @@ Update project memory/notes with key review conclusions.
 
 ## Review Tracing
 
-After each `task(subagent_type="reviewer")` call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).
+After each `task(subagent_type="reviewer", category="most-capable")` call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).

@@ -2,7 +2,7 @@
 name: idea-creator
 description: Generate and rank research ideas given a broad direction. Use when user says "找idea", "brainstorm ideas", "generate research ideas", "what can we work on", or wants to explore a research area for publishable directions.
 argument-hint: [research-direction]
-allowed-tools: Bash(*), Read, Write, Grep, Glob, WebSearch, WebFetch, Agent, Task
+allowed-tools: Bash(*), Read, Write, Grep, Glob, WebSearch, WebFetch, Task
 ---
 
 # Research Idea Creator
@@ -67,12 +67,12 @@ Map the research area to understand what exists and where the gaps are.
    - Scaling regimes that haven't been explored
    - Diagnostic questions that nobody has asked
 
-### Phase 2: Idea Generation (brainstorm with reviewer agent)
+### Phase 2: Idea Generation (brainstorm with scholar agent)
 
-Use the reviewer agent via task() delegation for divergent thinking:
+Use the scholar agent via task() delegation for divergent thinking:
 
 ```
-task(subagent_type="reviewer"):
+task(subagent_type="scholar", category="general"):
   prompt: |
     You are a senior ML researcher brainstorming research ideas.
 
@@ -127,7 +127,7 @@ For each surviving idea, run a deeper evaluation:
 
 2. **Critical review**: Use the reviewer agent via task() delegation:
     ```
-    task(subagent_type="reviewer"):
+    task(subagent_type="reviewer", category="most-capable"):
       prompt: |
         Here are our top ideas after filtering:
         [paste surviving ideas with novelty check results]
@@ -286,4 +286,4 @@ implement                     → write code
 
 ## Review Tracing
 
-After each `task(subagent_type="reviewer")` call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).
+After each `task(subagent_type="reviewer", category="most-capable")` or `task(subagent_type="scholar")` call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).

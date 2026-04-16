@@ -40,7 +40,7 @@ Assemble the key information:
 Send the collected results to the reviewer for objective evaluation:
 
 ```
-task(subagent_type="reviewer"):
+task(subagent_type="reviewer", category="most-capable"):
   prompt: |
     RESULT-TO-CLAIM EVALUATION
 

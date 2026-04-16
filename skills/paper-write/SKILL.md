@@ -2,7 +2,7 @@
 name: paper-write
 description: "Draft LaTeX paper section by section from an outline. Use when user says \"写论文\", \"write paper\", \"draft LaTeX\", \"开始写\", or wants to generate LaTeX content from a paper plan."
 argument-hint: [venue-or-section]
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, WebSearch, WebFetch, Task
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Task
 ---
 
 # Paper Write: Section-by-Section LaTeX Generation
@@ -452,12 +452,12 @@ Passive voice IS acceptable for: established facts, methods where agent is irrel
 - Do Figure graphics match Table values?
 - Flag statistics cited only through secondary sources (reviews, textbooks) — recommend verifying primary source
 
-### Step 6: Cross-Review with Reviewer Agent
+### Step 6: Cross-Review with Reviewer Task
 
 Send the complete draft to the reviewer agent (category: most-capable):
 
 ```
-task(subagent_type="reviewer"):
+task(subagent_type="reviewer", category="most-capable"):
   prompt: |
     Review this [VENUE] paper draft (main body, excluding appendix).
 

@@ -2,7 +2,7 @@
 name: paper-claim-audit
 description: "Zero-context verification that every number, comparison, and scope claim in the paper matches raw result files. Uses a fresh cross-model reviewer with NO prior context to prevent confirmation bias. Use when user says \"审查论文数据\", \"check paper claims\", \"verify numbers\", \"论文数字核对\", or before submission to ensure paper-to-evidence fidelity."
 argument-hint: [paper-directory]
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, Task
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Task
 ---
 
 # Paper Claim Audit: Zero-Context Evidence Verification
@@ -73,12 +73,12 @@ NARRATIVE_REPORT.md, PAPER_PLAN.md, findings.md
 Any .md file that is an executor-written summary
 ```
 
-### Step 2: Fresh Reviewer Audit (Reviewer Agent — NEW task, stateless)
+### Step 2: Fresh Reviewer Audit (Reviewer Task — NEW task, stateless)
 
-**CRITICAL: Use `task(subagent_type="auditor")` for each run. Each task is stateless with zero prior context.**
+**CRITICAL: Use `task(subagent_type="auditor", category="most-capable")` for each run. Each task is stateless with zero prior context.**
 
 ```
-task(subagent_type="auditor"):
+task(subagent_type="auditor", category="most-capable"):
   prompt: |
     You are a paper-to-evidence auditor. You have ZERO prior context about
     this research. You will receive only paper source files and raw result
@@ -239,4 +239,4 @@ Same pattern as `/experiment-audit`:
 
 ## Review Tracing
 
-After each `task(subagent_type="reviewer")` or `task(subagent_type="auditor")` call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).
+After each `task(subagent_type="reviewer", category="most-capable")` or `task(subagent_type="auditor", category="most-capable")` call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).

@@ -2,7 +2,7 @@
 name: figure-spec
 description: "Generate deterministic publication-quality architecture, workflow, and pipeline diagrams from structured JSON (FigureSpec) into editable SVG. Use when user says \"架构图\", \"workflow 图\", \"pipeline 图\", \"确定性矢量图\", \"figure spec\", \"draw architecture\", or needs precise, editable, publication-ready vector diagrams. Preferred over AI illustration for formal architecture/workflow figures."
 argument-hint: [description-of-diagram]
-allowed-tools: Bash(*), Read, Write, Edit
+allowed-tools: Bash(*), Read, Write, Edit, Task
 ---
 
 # FigureSpec: Deterministic JSON → SVG Figure Generation
@@ -129,7 +129,7 @@ If issues found, edit the JSON spec (never the generated SVG) and re-render.
 For paper architecture figures, invoke cross-model review:
 
 ```
-task(subagent_type="reviewer"):
+task(subagent_type="reviewer", category="most-capable"):
   prompt: |
     Review this SVG figure for a technical paper (architecture / workflow diagram).
 
@@ -216,4 +216,4 @@ Three-stage horizontal cascade with inputs feeding in from top, outputs exiting 
 
 ## Review Tracing
 
-After each `task(subagent_type="reviewer")` call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).
+After each `task(subagent_type="reviewer", category="most-capable")` call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).

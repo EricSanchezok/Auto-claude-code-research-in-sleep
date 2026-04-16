@@ -2,7 +2,7 @@
 name: meta-optimize
 description: "Analyze ARIS usage logs and propose optimizations to SKILL.md files, reviewer prompts, and workflow defaults. Outer-loop harness optimization inspired by Meta-Harness (Lee et al., 2026). Use when user says \"优化技能\", \"meta optimize\", \"improve skills\", \"分析使用记录\", or wants to optimize ARIS's own harness components based on accumulated experience."
 argument-hint: [target-skill-or-all]
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, Task
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Task
 ---
 
 # Meta-Optimize: Outer-Loop Harness Optimization for ARIS
@@ -126,7 +126,7 @@ For each optimization target, generate a concrete diff:
 Send each patch to a reviewer subagent for adversarial review:
 
 ```
-task(subagent_type="reviewer"):
+task(subagent_type="reviewer", category="most-capable"):
   prompt: |
     You are reviewing a proposed optimization to an ARIS SKILL.md file.
     

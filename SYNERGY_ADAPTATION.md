@@ -6,12 +6,12 @@ This is a Synergy-adapted fork of [ARIS (Auto-claude-code-research-in-sleep)](ht
 
 The upstream ARIS system relies on **Codex MCP** (`mcp__codex__codex`) for cross-model review — Claude Code executes while GPT reviews via MCP tool calls. This fork replaces that architecture with **Synergy-native agents and task delegation**:
 
-- `mcp__codex__codex` / `mcp__codex__codex-reply` → `task(subagent_type="reviewer", ...)`
+- `mcp__codex__codex` / `mcp__codex__codex-reply` → `task(subagent_type="reviewer"|"scholar"|"scribe"|"master", ...)`
 - `codex exec` (nightmare mode) → `task(subagent_type="auditor", ...)`
-- `reasoning_effort: xhigh` → `category: "most-capable"` (Synergy's task category system)
+- `reasoning_effort: xhigh` → `category: "most-capable"` for reviewer/auditor, `category: "general"` for scholar/master, `category: "writing"` for scribe
 - MCP threadId conversation threading → stateless task calls with full context per round
+- `Agent` tool (Claude Code) → `Task` tool (Synergy)
 - `~/.claude/feishu.json` → platform-agnostic feishu notification config
-- Three workflow skills (`research-pipeline`, `idea-discovery`, `paper-writing`) now include optional DAG orchestration sections for parallel execution in Synergy
 
 Everything else is preserved: workflow logic, artifact contracts (Markdown files like `AUTO_REVIEW.md`, `REVIEWER_MEMORY.md`, etc.), scoring rubrics, difficulty levels, SSH experiment deployment, and the full skill set.
 
@@ -90,13 +90,16 @@ cd mcp-servers/minimax-chat && npm install
 
 ## Agents
 
-### reviewer
+ARIS skills delegate to Synergy agents based on task role:
 
-Cross-model research reviewer for adversarial scientific critique. Scores research work 1-10, identifies weaknesses, and demands minimum viable fixes. Supports three difficulty levels: medium (standard), hard (with reviewer memory), and nightmare (full repo access).
+| Agent | Role | category | Used by |
+|-------|------|----------|---------|
+| `reviewer` | Adversarial scientific critique (score 1-10, find weaknesses, patent examiner) | `most-capable` | auto-review-loop, research-review, paper-plan, paper-write, proof-checker, patent-review, etc. |
+| `auditor` | Experiment integrity audit (cross-verify numbers, catch fabrication) | `most-capable` | experiment-audit, paper-claim-audit, auto-review-loop nightmare mode |
+| `scholar` | Literature / SOTA analysis (paper search, novelty assessment, idea evaluation) | `general` | idea-creator, novelty-check |
+| `master` | Code / implementation (LaTeX debugging, script fixes) | `general` | paper-compile |
 
-### auditor
-
-Experiment integrity auditor. Independently reads code, result files, and logs to verify that reported numbers match actual outputs. Catches fabricated ground truth, self-normalized scores, phantom results, and scope overclaims.
+Custom agent definitions (`agents/reviewer.md`, `agents/auditor.md`) must be installed. `scholar` and `master` are Synergy built-ins — no extra install needed.
 
 ## Usage
 

@@ -2,7 +2,7 @@
 name: patent-novelty-check
 description: "Assess patent novelty and non-obviousness against prior art. Use when user says \"专利查新\", \"patent novelty\", \"可专利性评估\", \"patentability check\", or wants to evaluate if an invention is patentable."
 argument-hint: [invention-description-or-brief-path]
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, WebSearch, WebFetch, Task
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Task
 ---
 
 # Patent Novelty and Non-Obviousness Check
@@ -78,7 +78,7 @@ Format as a matrix:
 Call the reviewer via `task(subagent_type="reviewer", category="most-capable")`:
 
 ```
-task(subagent_type="reviewer"):
+task(subagent_type="reviewer", category="most-capable"):
   prompt: |
     You are a senior patent examiner at the [USPTO/CNIPA/EPO].
     Examine the following invention for patentability.

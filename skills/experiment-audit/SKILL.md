@@ -2,7 +2,7 @@
 name: experiment-audit
 description: "Audit experiment integrity before claiming results. Uses cross-model review to check for fake ground truth, score normalization fraud, phantom results, and insufficient scope. Use when user says \"审计实验\", \"check experiment integrity\", \"audit results\", \"实验诚实度\", or after experiments complete before writing claims."
 argument-hint: [experiment-dir-or-results-path]
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, Task
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Task
 ---
 
 # Experiment Audit: Cross-Model Integrity Verification
@@ -52,7 +52,7 @@ Scan project directory for:
 Pass ONLY file paths and the audit checklist to the reviewer. The reviewer reads everything directly.
 
 ```
-task(subagent_type="auditor"):
+task(subagent_type="auditor", category="most-capable"):
   prompt: |
     You are an experiment integrity auditor. Read ALL files listed below
     and check for the following fraud patterns.

@@ -2,7 +2,7 @@
 name: invention-structuring
 description: "Structure a raw invention idea into a formal invention disclosure. Use when user says \"构建发明\", \"structure invention\", \"发明构建\", \"invention disclosure\", or wants to formalize a rough idea into a patent-ready structure."
 argument-hint: [invention-description-or-brief-path]
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, Task
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Task
 ---
 
 # Invention Structuring
@@ -113,7 +113,7 @@ Dependent Claim 5 → alternative implementation of feature A
 Call the reviewer via `task(subagent_type="reviewer", category="most-capable")`:
 
 ```
-task(subagent_type="reviewer"):
+task(subagent_type="reviewer", category="most-capable"):
   prompt: |
     You are a patent attorney reviewing an invention disclosure.
     Evaluate the structuring choices:

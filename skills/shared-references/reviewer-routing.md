@@ -1,10 +1,18 @@
-# Reviewer Routing
+# Agent Routing
 
-## Default
+## Agent Selection
 
-All review calls use the **reviewer** agent via `task(subagent_type="reviewer")`.
+ARIS skills delegate to different Synergy agents based on the task role:
 
-This is the default for ALL skills. No parameter or config changes this.
+| Task role | subagent_type | category | When to use |
+|-----------|--------------|----------|-------------|
+| Adversarial scientific critique | `reviewer` | `most-capable` | Score 1-10, find weaknesses, accept/reject, patent examiner |
+| Experiment integrity audit | `auditor` | `most-capable` | Cross-verify numbers, catch fabrication, code audit |
+| Literature / SOTA analysis | `scholar` | `general` | Paper search, novelty assessment, idea evaluation |
+| Writing quality / prose | `scribe` | `writing` | Narrative structure, clarity, style polish |
+| Code / implementation | `master` | `general` | LaTeX debugging, script fixes, implementation |
+
+**Default**: When in doubt, use `reviewer` with `category="most-capable"`.
 
 ## Difficulty Levels
 
@@ -22,18 +30,18 @@ The `reviewer` agent supports three difficulty levels, passed as context in the 
 Parse $ARGUMENTS for `— reviewer:` directive.
 
 If not specified:
-    → Use task(subagent_type="reviewer") with the standard prompt
+    → Use task(subagent_type="reviewer", category="most-capable") with the standard prompt
     → This is the DEFAULT.
 
 If `— reviewer: auditor`:
-    → Use task(subagent_type="auditor") for integrity-focused review
+    → Use task(subagent_type="auditor", category="most-capable") for integrity-focused review
     → The auditor reads code, result files, and logs independently
     → Best for nightmare difficulty or experiment verification
 ```
 
-## Task Category
+## Task Call Formats
 
-All reviewer and auditor task calls should use `category: "most-capable"` to ensure maximum reasoning depth. This is the Synergy equivalent of the upstream `reasoning_effort: xhigh` setting.
+### Reviewer (adversarial critique)
 
 ```
 task(
@@ -51,7 +59,7 @@ task(
 )
 ```
 
-For auditor tasks (experiment integrity, code verification):
+### Auditor (integrity verification)
 
 ```
 task(
@@ -69,11 +77,45 @@ task(
 )
 ```
 
-The `category` parameter is a hard invariant — reviewer quality is non-negotiable. See `effort-contract.md` for the full effort system.
+### Scholar (literature / SOTA)
+
+```
+task(
+  subagent_type="scholar",
+  category="general",
+  prompt="""
+    Search for related work on [topic].
+
+    Focus on: [specific aspect]
+    Exclude: [known work to skip]
+
+    For each paper found, provide: title, authors, year, key contribution, relevance.
+  """
+)
+```
+
+### Scribe (writing quality)
+
+```
+task(
+  subagent_type="scribe",
+  category="writing",
+  prompt="""
+    Review the writing quality of this paper section.
+
+    Files to read:
+    - /absolute/path/to/section.tex
+
+    Focus on: clarity, narrative flow, active voice, redundancy.
+  """
+)
+```
+
+The `category` parameter for reviewer/auditor is a hard invariant — reviewer quality is non-negotiable. Scholar and scribe use lower categories since they don't need adversarial reasoning. See `effort-contract.md` for the full effort system.
 
 ## Invariants
 
 - Reviewer independence protocol still applies (pass file paths, not summaries)
-- `difficulty` controls how adversarial the review is, not which backend to use
+- `difficulty` controls how adversarial the review is, not which agent to use
 - For nightmare difficulty, dispatch both `reviewer` and `auditor` agents for maximum coverage
 - `beast` mode may recommend auditor verification but never requires it

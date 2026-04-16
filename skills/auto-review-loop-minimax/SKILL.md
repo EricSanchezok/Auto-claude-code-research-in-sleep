@@ -2,7 +2,7 @@
 name: auto-review-loop-minimax
 description: Autonomous multi-round research review loop using MiniMax API. Use when you want to use MiniMax for external review. Trigger with "auto review loop minimax" or "minimax review".
 argument-hint: [topic-or-scope]
-allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Agent, Skill, Task
+allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Skill, Task
 ---
 
 # Auto Review Loop (MiniMax Version): Autonomous Research Improvement

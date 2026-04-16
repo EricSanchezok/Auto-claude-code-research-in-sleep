@@ -2,7 +2,7 @@
 name: claims-drafting
 description: "Draft patent claims for an invention. Use when user says \"撰写权利要求\", \"draft claims\", \"写权利要求书\", \"claim drafting\", or wants to create patent claims. The core skill of the patent pipeline."
 argument-hint: [invention-disclosure-path]
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, WebSearch, WebFetch, Task
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Task
 ---
 
 # Claims Drafting: The Core Patent Skill
@@ -135,7 +135,7 @@ If any element lacks specification support, add it to the specification requirem
 Call the reviewer via `task(subagent_type="reviewer", category="most-capable")`:
 
 ```
-task(subagent_type="reviewer"):
+task(subagent_type="reviewer", category="most-capable"):
   prompt: |
     You are a senior patent examiner at the [USPTO/CNIPA/EPO].
     Review the following patent claims for quality and patentability.
@@ -171,7 +171,7 @@ If the examiner review identifies issues:
 1. Address all CRITICAL issues (anticipation, obviousness, indefiniteness)
 2. Address MAJOR issues (scope too narrow, missing support, weak fallbacks)
 3. Consider MINOR issues (antecedent basis, formatting)
-4. Re-submit to the reviewer for round 2 (via a follow-up `task(subagent_type="reviewer", ...)`)
+4. Re-submit to the reviewer for round 2 (via a follow-up `task(subagent_type="reviewer", category="most-capable", ...)`)
 5. Repeat up to `MAX_CLAIM_REVISION_ROUNDS` times
 
 ### Step 7: Output

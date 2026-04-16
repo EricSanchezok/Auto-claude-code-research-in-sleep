@@ -1,7 +1,7 @@
 ---
 name: research-refine
 description: 'Turn a vague research direction into a problem-anchored, elegant, frontier-aware, implementation-oriented method plan via iterative reviewer agent review. Use when the user says "refine my approach", "帮我细化方案", "decompose this problem", "打磨idea", "refine research plan", "细化研究方案", or wants a concrete research method that stays simple, focused, and top-venue ready instead of a vague or overbuilt idea.'
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Agent, Task
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Task
 ---
 
 # Research Refine: Problem-Anchored, Elegant, Frontier-Aware Plan Refinement
@@ -315,7 +315,7 @@ Use this structure:
 Send the full proposal to the reviewer agent for an **elegance-first, frontier-aware, method-first** review. The reviewer should spend most of the critique budget on the method itself, not on expanding the experiment menu.
 
 ```
-task(subagent_type="reviewer"):
+task(subagent_type="reviewer", category="most-capable"):
   prompt: |
     You are a senior ML reviewer for a top venue (NeurIPS/ICML/ICLR).
     This is an early-stage, method-first research proposal.
@@ -490,7 +490,7 @@ Save to `refine-logs/round-N-refinement.md`:
 Send the revised proposal back to the reviewer agent. Each task() call is stateless — include full context (Problem Anchor, prior review scores, and the complete revised proposal) in the prompt:
 
 ```
-task(subagent_type="reviewer"):
+task(subagent_type="reviewer", category="most-capable"):
   prompt: |
     [Round N re-evaluation]
 

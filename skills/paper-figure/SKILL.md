@@ -2,7 +2,7 @@
 name: paper-figure
 description: "Generate publication-quality figures and tables from experiment results. Use when user says \"画图\", \"作图\", \"generate figures\", \"paper figures\", or needs plots for a paper."
 argument-hint: [figure-plan-or-data-path]
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, Task
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Task
 ---
 
 # Paper Figure: Publication-Quality Plots from Experiment Data
@@ -197,12 +197,12 @@ For each figure, output the LaTeX code to include it:
 
 Save all snippets to `figures/latex_includes.tex` for easy copy-paste into the paper.
 
-### Step 7: Figure Quality Review with Reviewer Agent
+### Step 7: Figure Quality Review with Reviewer Task
 
 Send figure descriptions and captions to the reviewer agent for review:
 
 ```
-task(subagent_type="reviewer"):
+task(subagent_type="reviewer", category="most-capable"):
   prompt: |
     Review these figure/table plans for a [VENUE] submission.
 

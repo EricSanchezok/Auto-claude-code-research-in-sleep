@@ -2,7 +2,7 @@
 name: paper-plan
 description: "Generate a structured paper outline from review conclusions and experiment results. Use when user says \"写大纲\", \"paper outline\", \"plan the paper\", \"论文规划\", or wants to create a paper plan before writing."
 argument-hint: [topic-or-narrative-doc]
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, WebSearch, WebFetch, Task
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Task
 ---
 
 # Paper Plan: From Review Conclusions to Paper Outline
@@ -205,12 +205,12 @@ For each section, list required citations:
 3. Flag any citation you're unsure about with `[VERIFY]`
 4. Prefer published versions over arXiv preprints when available
 
-### Step 6: Cross-Review with Reviewer Agent
+### Step 6: Cross-Review with Reviewer Task
 
 Send the complete outline to the reviewer agent (category: most-capable) for feedback:
 
 ```
-task(subagent_type="reviewer"):
+task(subagent_type="reviewer", category="most-capable"):
   prompt: |
     Review this paper outline for a [VENUE] submission.
     [full outline including Claims-Evidence Matrix]

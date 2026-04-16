@@ -2,7 +2,7 @@
 name: specification-writing
 description: "Write the full patent specification from claims and invention disclosure. Use when user says \"撰写说明书\", \"write specification\", \"写说明书\", \"patent description\", or wants to draft the complete patent specification."
 argument-hint: [claims-path]
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, Skill, WebSearch, WebFetch, Task
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Skill, WebSearch, WebFetch, Task
 ---
 
 # Specification Writing: Section-by-Section Patent Description
@@ -155,7 +155,7 @@ If any element lacks support, add the necessary description before proceeding.
 Call the reviewer via `task(subagent_type="reviewer", category="most-capable")`:
 
 ```
-task(subagent_type="reviewer"):
+task(subagent_type="reviewer", category="most-capable"):
   prompt: |
     You are a patent examiner reviewing a specification for completeness.
     CLAIMS: [all claims]

@@ -39,6 +39,7 @@ Cross-model adversarial collaboration only works if the reviewer forms its own a
 ```
 task(
   subagent_type="reviewer",
+  category="most-capable",
   prompt="""
     Review the following research project as a senior ML reviewer.
 
@@ -59,6 +60,7 @@ task(
 ```
 task(
   subagent_type="reviewer",
+  category="most-capable",
   prompt="""
     The main contribution is a new loss function that improves by 15%.
     However, I noticed the ablation is incomplete.
@@ -78,7 +80,7 @@ This protocol applies to ALL reviewer agent calls in the research workflow:
 - `/paper-figure` — figure quality review
 - `/rebuttal` — stress test
 - `/meta-optimize` — patch review
-- Any skill that dispatches `task(subagent_type="reviewer")` or `task(subagent_type="auditor")`
+- Any skill that dispatches `task(subagent_type="reviewer", category="most-capable")` or `task(subagent_type="auditor", category="most-capable")`
 
 ## Exception
 

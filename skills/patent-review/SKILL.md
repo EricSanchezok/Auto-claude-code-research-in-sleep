@@ -2,7 +2,7 @@
 name: patent-review
 description: "Get an external patent examiner review of a patent application. Use when user says \"专利审查\", \"patent review\", \"审查意见\", \"examiner review\", or wants critical feedback on patent claims and specification."
 argument-hint: [patent-directory-or-scope]
-allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Agent, Task
+allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Task
 ---
 
 # Patent Examiner Review via Cross-Model Task
@@ -39,7 +39,7 @@ Before calling the external reviewer, compile a comprehensive briefing:
 Send to the reviewer via `task(subagent_type="reviewer", category="most-capable")`:
 
 ```
-task(subagent_type="reviewer"):
+task(subagent_type="reviewer", category="most-capable"):
   prompt: |
     You are a senior patent examiner at the [USPTO/CNIPA/EPO].
     Examine this patent application and issue a detailed office action.
@@ -119,10 +119,10 @@ For each fix:
 
 ### Step 4: Round 2 — Follow-Up Review
 
-Send the revisions to the reviewer via a follow-up `task(subagent_type="reviewer", ...)`:
+Send the revisions to the reviewer via a follow-up `task(subagent_type="reviewer", category="most-capable", ...)`:
 
 ```
-task(subagent_type="reviewer"):
+task(subagent_type="reviewer", category="most-capable"):
   prompt: |
     Here is the revised patent application after addressing your office action.
 

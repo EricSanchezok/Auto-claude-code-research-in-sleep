@@ -2,7 +2,7 @@
 name: proof-checker
 description: Rigorous mathematical proof verification and fixing workflow. Reads a LaTeX proof, identifies gaps via cross-model review, fixes each gap with full derivations, re-reviews, and generates an audit report. Use when user says "检查证明", "verify proof", "proof check", "审证明", "check this proof", or wants rigorous mathematical verification of a theory paper.
 argument-hint: [path-to-tex-file or proof-description]
-allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Agent, Task
+allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Task
 ---
 
 # Proof Checker: Rigorous Mathematical Verification & Fixing
@@ -179,7 +179,7 @@ Flag any statement where limit order is ambiguous or uniformity is unclear.
 Submit the **complete proof content** to the reviewer via `task()` with the following **mandatory reviewer checklist** in the prompt:
 
 ```
-task(subagent_type="reviewer"):
+task(subagent_type="reviewer", category="most-capable"):
   prompt: |
     You are performing a rigorous mathematical proof review. For EVERY theorem,
     lemma, and proposition, check ALL of the following:
@@ -290,7 +290,7 @@ pdflatex -interaction=nonstopmode <file>.tex 2>&1 | grep -E "Error|Warning|undef
 
 ### Phase 3: Re-Review (cross-model reviewer)
 
-Submit a **new** `task(subagent_type="reviewer")` call with the **complete current proof content** plus fix summaries. Include the full proof context each round (stateless calls). Request the same mandatory checklist.
+Submit a **new** `task(subagent_type="reviewer", category="most-capable")` call with the **complete current proof content** plus fix summaries. Include the full proof context each round (stateless calls). Request the same mandatory checklist.
 
 Check acceptance gate. If not met, repeat Phases 2-3 (up to MAX_REVIEW_ROUNDS).
 
@@ -309,7 +309,7 @@ After all fixes, verify the proof as a whole:
 For any fix that resolved a FATAL or CRITICAL issue, submit the **fixed section alone** (without showing the previous critique) to a **fresh reviewer task**:
 
 ```
-task(subagent_type="reviewer"):
+task(subagent_type="reviewer", category="most-capable"):
   prompt: |
     Blind review of the following proof section. You have NOT seen any prior
     review or discussion. Check every step for correctness, hidden assumptions,
@@ -379,7 +379,7 @@ Write `PROOF_CHECK_STATE.json`:
 - **No silent assumption strengthening**: Any fix that adds conditions must propagate to the theorem statement.
 
 ### Cross-model protocol
-- **The executor analyzes, the reviewer reviews**: The executor reads proof, formulates questions, implements fixes. The reviewer provides adversarial review via `task(subagent_type="reviewer")`.
+- **The executor analyzes, the reviewer reviews**: The executor reads proof, formulates questions, implements fixes. The reviewer provides adversarial review via `task(subagent_type="reviewer", category="most-capable")`.
 - **Reviewer category always most-capable**: Never downgrade.
 - **Send full content**: Don't summarize — send actual math for line-by-line checking. Each `task()` call is stateless, so include the complete proof context every round.
 
