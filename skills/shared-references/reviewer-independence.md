@@ -37,8 +37,9 @@ Cross-model adversarial collaboration only works if the reviewer forms its own a
 ## Correct pattern
 
 ```
-mcp__codex__codex:
-  prompt: |
+task(
+  subagent_type="reviewer",
+  prompt="""
     Review the following research project as a senior ML reviewer.
 
     Files to read:
@@ -49,22 +50,27 @@ mcp__codex__codex:
 
     Please read all files yourself and provide a complete review.
     Score 1-10 on: novelty, soundness, clarity, significance.
+  """
+)
 ```
 
 ## Incorrect pattern
 
 ```
-mcp__codex__codex:
-  prompt: |
+task(
+  subagent_type="reviewer",
+  prompt="""
     The main contribution is a new loss function that improves by 15%.
     However, I noticed the ablation is incomplete.
     Here's my summary of the key results: [...]
     Please review whether this is publishable.
+  """
+)
 ```
 
 ## When to apply
 
-This protocol applies to ALL cross-model review calls in ARIS:
+This protocol applies to ALL reviewer agent calls in the research workflow:
 - `/research-review` — paper review
 - `/auto-review-loop` — iterative review
 - `/paper-plan` — outline review
@@ -72,8 +78,8 @@ This protocol applies to ALL cross-model review calls in ARIS:
 - `/paper-figure` — figure quality review
 - `/rebuttal` — stress test
 - `/meta-optimize` — patch review
-- Any skill that sends artifacts to `mcp__codex__codex` or `mcp__codex__codex-reply`
+- Any skill that dispatches `task(subagent_type="reviewer")` or `task(subagent_type="auditor")`
 
 ## Exception
 
-Multi-round review within the SAME thread (`codex-reply`) may reference the reviewer's own previous feedback to check resolution — but still must not include executor interpretations of that feedback.
+Multi-round review within the same session may reference the reviewer's own previous feedback to check resolution — but still must not include executor interpretations of that feedback.

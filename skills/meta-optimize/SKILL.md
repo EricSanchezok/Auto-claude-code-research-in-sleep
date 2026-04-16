@@ -2,7 +2,7 @@
 name: meta-optimize
 description: "Analyze ARIS usage logs and propose optimizations to SKILL.md files, reviewer prompts, and workflow defaults. Outer-loop harness optimization inspired by Meta-Harness (Lee et al., 2026). Use when user says \"优化技能\", \"meta optimize\", \"improve skills\", \"分析使用记录\", or wants to optimize ARIS's own harness components based on accumulated experience."
 argument-hint: [target-skill-or-all]
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, mcp__codex__codex, mcp__codex__codex-reply
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, Task
 ---
 
 # Meta-Optimize: Outer-Loop Harness Optimization for ARIS
@@ -24,13 +24,13 @@ Inspired by Meta-Harness (Lee et al., 2026): the key insight is that harness des
 | Convergence rules | When to stop the review loop, retry counts | Yes |
 | Workflow ordering | Skill chain sequence within a workflow | Yes |
 | Artifact schemas | What fields go in EXPERIMENT_LOG.md, idea-stage/IDEA_REPORT.md | Cautious |
-| MCP bridge config | Which reviewer model, routing rules | No (infra) |
+| Reviewer config | Which reviewer subagent, routing rules | No (infra) |
 
 **Not optimized**: The research artifacts themselves (papers, code, experiments). That's what the regular workflows do.
 
 ## Prerequisites
 
-1. **Logging must be active.** Copy `templates/claude-hooks/meta_logging.json` into your project's `.claude/settings.json` (or merge the hooks section).
+1. **Logging must be active.** Ensure the ARIS event hooks are configured in your project settings.
 2. **Sufficient data.** At least 5 complete workflow runs logged in `.aris/meta/events.jsonl`. The skill will check and warn if insufficient.
 
 ## Workflow
@@ -41,7 +41,7 @@ Inspired by Meta-Harness (Lee et al., 2026): the key insight is that harness des
 EVENTS_FILE=".aris/meta/events.jsonl"
 if [ ! -f "$EVENTS_FILE" ]; then
     echo "ERROR: No event log found at $EVENTS_FILE"
-    echo "Enable logging first: copy templates/claude-hooks/meta_logging.json into .claude/settings.json"
+    echo "Enable logging first: ensure ARIS event hooks are configured in your project settings"
     exit 1
 fi
 
@@ -123,12 +123,10 @@ For each optimization target, generate a concrete diff:
 
 ### Step 4: Cross-Model Review of Patches
 
-Send each patch to GPT-5.4 xhigh for adversarial review:
+Send each patch to a reviewer subagent for adversarial review:
 
 ```
-mcp__codex__codex:
-  model: gpt-5.4
-  config: {"model_reasoning_effort": "xhigh"}
+task(subagent_type="reviewer"):
   prompt: |
     You are reviewing a proposed optimization to an ARIS SKILL.md file.
     
@@ -200,7 +198,7 @@ If user runs `/meta-optimize apply [N]`:
 
 - **Log-driven, not speculative.** Every proposed change must cite specific data from the event log. No "I think this would be better."
 - **Minimal patches.** Change one thing at a time. Don't rewrite entire skills.
-- **Reviewer-gated.** Every patch goes through cross-model review before recommendation.
+- **Reviewer-gated.** Every patch goes through cross-model review via a reviewer subagent before recommendation.
 - **Reversible.** Always back up before applying. Always log what changed.
 - **User-approved.** Never auto-apply. Present, explain, let the user decide.
 - **Honest about uncertainty.** If the data is insufficient, say so. Don't optimize on noise.
@@ -213,7 +211,7 @@ The log at `.aris/meta/events.jsonl` contains JSONL records with these shapes:
 ```jsonl
 {"ts":"...","session":"...","event":"skill_invoke","skill":"auto-review-loop","args":"difficulty: hard"}
 {"ts":"...","session":"...","event":"PostToolUse","tool":"Bash","input_summary":"pdflatex main.tex"}
-{"ts":"...","session":"...","event":"codex_call","tool":"mcp__codex__codex","input_summary":"review..."}
+{"ts":"...","session":"...","event":"reviewer_call","tool":"task","input_summary":"review..."}
 {"ts":"...","session":"...","event":"tool_failure","tool":"Bash","input_summary":"python train.py"}
 {"ts":"...","session":"...","event":"slash_command","command":"/auto-review-loop","args":""}
 {"ts":"...","session":"...","event":"user_prompt","prompt_preview":"change difficulty to hard"}
@@ -225,9 +223,9 @@ The log at `.aris/meta/events.jsonl` contains JSONL records with these shapes:
 
 This skill is NOT part of the standard W1→W1.5→W2→W3→W4 pipeline. It is a **maintenance workflow** with three trigger mechanisms:
 
-1. **Passive logging** (always on): Claude Code hooks record events to `.aris/meta/events.jsonl` automatically during normal usage. Zero user effort.
+1. **Passive logging** (always on): Event hooks record events to `.aris/meta/events.jsonl` automatically during normal usage. Zero user effort.
 
-2. **Automatic readiness check** (SessionEnd hook): When a Claude Code session ends, `check_ready.sh` counts skill invocations since the last `/meta-optimize` run. If ≥5 new invocations have accumulated, it prints a reminder:
+2. **Automatic readiness check** (SessionEnd hook): When a session ends, `check_ready.sh` counts skill invocations since the last `/meta-optimize` run. If ≥5 new invocations have accumulated, it prints a reminder:
    ```
    📊 ARIS has logged 8 skill runs since last optimization. Run /meta-optimize to check for improvement opportunities.
    ```
@@ -250,4 +248,4 @@ Inspired by [Meta-Harness](https://arxiv.org/abs/2603.28052) (Lee et al., 2026) 
 
 ## Review Tracing
 
-After each `mcp__codex__codex` or `mcp__codex__codex-reply` reviewer call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).
+After each reviewer `task()` call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).

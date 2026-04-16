@@ -1,89 +1,79 @@
 # Reviewer Routing
 
-## Default (NEVER changes without explicit user request)
+## Default
 
-All review calls use **Codex MCP** (`mcp__codex__codex`) with `reasoning_effort: xhigh`.
+All review calls use the **reviewer** agent via `task(subagent_type="reviewer")`.
 
-This is the default for ALL skills. No parameter, no config, no effort level changes this.
+This is the default for ALL skills. No parameter or config changes this.
 
-## Optional: GPT-5.4 Pro via Oracle
+## Difficulty Levels
 
-When the user explicitly passes `— reviewer: oracle-pro`, route the review through Oracle MCP instead of Codex MCP.
+The `reviewer` agent supports three difficulty levels, passed as context in the task prompt:
 
-### Routing Logic (add to any reviewer-invoking skill)
+| Level | Behavior |
+|-------|----------|
+| `medium` (default) | Standard review based on provided file paths. Reviewer reads files and judges independently. |
+| `hard` | Adds **Reviewer Memory** (reviewer tracks suspicions across rounds via `REVIEWER_MEMORY.md`) + **Debate Protocol** (executor can rebut, reviewer rules). |
+| `nightmare` | Everything in `hard` + reviewer gets full repo access + **Adversarial Verification** (reviewer independently checks if code matches claims). Use the `auditor` agent for the verification step. |
+
+## Routing Logic
 
 ```
 Parse $ARGUMENTS for `— reviewer:` directive.
 
-If not specified OR `— reviewer: codex`:
-    → Use mcp__codex__codex with reasoning_effort: xhigh
-    → This is the DEFAULT. No change from current behavior.
+If not specified:
+    → Use task(subagent_type="reviewer") with the standard prompt
+    → This is the DEFAULT.
 
-If `— reviewer: oracle-pro`:
-    → Check if mcp__oracle__consult tool is available
-    → If available:
-        Use mcp__oracle__consult with:
-          model: "gpt-5.4-pro"
-          prompt: [same prompt you would send to Codex]
-          files: [file paths for reviewer to read directly]
-        Note: Oracle may use API mode (fast, needs OPENAI_API_KEY)
-              or browser mode (slow ~1-2 min, needs Chrome + ChatGPT login)
-    → If NOT available:
-        Print: "⚠️ Oracle MCP not installed. Falling back to Codex xhigh."
-        Use mcp__codex__codex as normal.
+If `— reviewer: auditor`:
+    → Use task(subagent_type="auditor") for integrity-focused review
+    → The auditor reads code, result files, and logs independently
+    → Best for nightmare difficulty or experiment verification
 ```
 
-### Invariants
+## Task Category
 
-- `— reviewer: oracle-pro` ONLY takes effect when explicitly passed
-- Reviewer independence protocol still applies (pass file paths, not summaries)
-- `effort` and `difficulty` are orthogonal — they don't change reviewer backend
-- `beast` mode may RECOMMEND oracle-pro but never requires it
-- Browser mode: acceptable for one-shot reviews; NOT recommended inside multi-round loops (too slow/brittle)
-
-### Oracle MCP Call Format
+All reviewer and auditor task calls should use `category: "most-capable"` to ensure maximum reasoning depth. This is the Synergy equivalent of the upstream `reasoning_effort: xhigh` setting.
 
 ```
-mcp__oracle__consult:
-  prompt: |
-    [role + task + output schema]
-    Read all listed files directly.
-  model: "gpt-5.4-pro"
-  files:
+task(
+  subagent_type="reviewer",
+  category="most-capable",
+  prompt="""
+    [role + difficulty level + round context]
+
+    Files to read:
     - /absolute/path/to/file1
     - /absolute/path/to/file2
+
+    [review instructions + output format]
+  """
+)
 ```
 
-### Skills That Support `— reviewer: oracle-pro`
+For auditor tasks (experiment integrity, code verification):
 
-| Skill | Use case for Pro |
-|-------|-----------------|
-| `/research-review` | Deeper critique on paper drafts |
-| `/auto-review-loop` | Final stress test (last round only in browser mode) |
-| `/experiment-audit` | Line-by-line eval code audit |
-| `/proof-checker` | Deep mathematical reasoning |
-| `/rebuttal` | Stress test before submission |
-| `/idea-creator` | Idea evaluation depth |
-| `/research-lit` | Literature analysis depth |
+```
+task(
+  subagent_type="auditor",
+  category="most-capable",
+  prompt="""
+    Audit the experiment integrity for this project.
 
-### Installation
+    Project directory: /absolute/path/to/project
+    Claims document: /absolute/path/to/NARRATIVE_REPORT.md
+    Results directory: /absolute/path/to/results/
 
-```bash
-# Install Oracle CLI + MCP
-npm install -g @steipete/oracle
-
-# Add Oracle MCP to Claude Code
-claude mcp add oracle -s user -- oracle-mcp
-
-# Restart Claude Code session to load
-
-# API mode (fast, recommended):
-export OPENAI_API_KEY="your-key"
-
-# Browser mode (no API key, slower):
-# Just log in to ChatGPT in Chrome
+    [audit instructions]
+  """
+)
 ```
 
-### NOT installed = ZERO impact
+The `category` parameter is a hard invariant — reviewer quality is non-negotiable. See `effort-contract.md` for the full effort system.
 
-If Oracle is not installed, `— reviewer: oracle-pro` gracefully falls back to Codex. No error, no breakage, just a warning.
+## Invariants
+
+- Reviewer independence protocol still applies (pass file paths, not summaries)
+- `difficulty` controls how adversarial the review is, not which backend to use
+- For nightmare difficulty, dispatch both `reviewer` and `auditor` agents for maximum coverage
+- `beast` mode may recommend auditor verification but never requires it

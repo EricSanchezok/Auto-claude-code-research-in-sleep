@@ -2,7 +2,7 @@
 name: paper-writing
 description: "Workflow 3: Full paper writing pipeline. Orchestrates paper-plan → paper-figure → figure-spec/paper-illustration/mermaid-diagram → paper-write → paper-compile → auto-paper-improvement-loop to go from a narrative report to a polished, submission-ready PDF. Use when user says \"写论文全流程\", \"write paper pipeline\", \"从报告到PDF\", \"paper writing\", or wants the complete paper generation workflow."
 argument-hint: [narrative-report-path-or-topic]
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, Skill, mcp__codex__codex, mcp__codex__codex-reply
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, Skill, Task
 ---
 
 # Workflow 3: Paper Writing Pipeline
@@ -26,7 +26,7 @@ In this hybrid pack, the pipeline itself is unchanged, but `paper-plan` and `pap
 
 - **VENUE = `ICLR`** — Target venue. Options: `ICLR`, `NeurIPS`, `ICML`, `CVPR`, `ACL`, `AAAI`, `ACM`, `IEEE_JOURNAL` (IEEE Transactions / Letters), `IEEE_CONF` (IEEE conferences). Affects style file, page limit, citation format.
 - **MAX_IMPROVEMENT_ROUNDS = 2** — Number of review→fix→recompile rounds in the improvement loop.
-- **REVIEWER_MODEL = `gpt-5.4`** — Model used via Codex MCP for plan review, figure review, writing review, and improvement loop.
+- Reviewer routing is configured via `shared-references/reviewer-routing.md`.
 - **AUTO_PROCEED = true** — Auto-continue between phases. Set `false` to pause and wait for user approval after each phase.
 - **HUMAN_CHECKPOINT = false** — When `true`, the improvement loop (Phase 5) pauses after each round's review to let you see the score and provide custom modification instructions. When `false` (default), the loop runs fully autonomously. Passed through to `/auto-paper-improvement-loop`.
 - **ILLUSTRATION = `figurespec`** — Architecture/illustration generator for Phase 2b: `figurespec` (default, deterministic JSON→SVG via `/figure-spec`, best for architecture/workflow/topology), `gemini` (AI-generated via `/paper-illustration`, best for qualitative method illustrations; needs `GEMINI_API_KEY`), `mermaid` (Mermaid syntax via `/mermaid-diagram`, free, best for flowcharts), or `false` (skip Phase 2b, manual only).
@@ -44,6 +44,25 @@ This pipeline accepts one of:
 
 The more detailed the input (especially figure descriptions and quantitative results), the better the output.
 
+## DAG Orchestration
+
+When running in Synergy, this pipeline benefits from DAG-based task tracking. Figures and some writing can proceed in parallel after planning:
+
+```
+dagwrite({ nodes: [
+  { id: "plan",        content: "Create paper outline via /paper-plan",                 status: "pending", deps: [] },
+  { id: "figures",     content: "Generate data plots via /paper-figure",                status: "pending", deps: ["plan"] },
+  { id: "illustrate",  content: "Generate architecture diagrams via /figure-spec",      status: "pending", deps: ["plan"] },
+  { id: "write",       content: "Write LaTeX sections via /paper-write",                status: "pending", deps: ["figures", "illustrate"] },
+  { id: "compile",     content: "Compile PDF via /paper-compile",                       status: "pending", deps: ["write"] },
+  { id: "proof-check", content: "Verify proofs via /proof-checker (if applicable)",     status: "pending", deps: ["compile"] },
+  { id: "claim-audit", content: "Audit claims via /paper-claim-audit (if applicable)",  status: "pending", deps: ["compile"] },
+  { id: "improve",     content: "Polish via /auto-paper-improvement-loop",              status: "pending", deps: ["proof-check", "claim-audit"] }
+]})
+```
+
+The `figures` and `illustrate` nodes fan out in parallel after `plan`, then converge before writing. Similarly, `proof-check` and `claim-audit` run in parallel before the improvement loop. If running without DAG support, the linear workflow below still works identically.
+
 ## Pipeline
 
 ### Phase 1: Paper Plan
@@ -60,7 +79,7 @@ Invoke `/paper-plan` to create the structural outline:
 - Design section structure (5-8 sections depending on paper type)
 - Plan figure/table placement with data sources
 - Scaffold citation structure
-- GPT-5.4 reviews the plan for completeness
+- The reviewer agent reviews the plan for completeness
 
 **Output:** `PAPER_PLAN.md` with section plan, figure plan, citation scaffolding.
 
@@ -92,7 +111,7 @@ Invoke `/paper-figure` to generate data-driven plots and tables:
 - Generate matplotlib/seaborn plots from JSON/CSV data
 - Generate LaTeX comparison tables
 - Create `figures/latex_includes.tex` for easy insertion
-- GPT-5.4 reviews figure quality and captions
+- The reviewer agent reviews figure quality and captions
 
 **Output:** `figures/` directory with PDFs, generation scripts, and LaTeX snippets.
 
@@ -117,7 +136,7 @@ If the paper plan includes architecture diagrams, pipeline figures, audit cascad
 ```
 /paper-illustration "[method description from PAPER_PLAN.md or NARRATIVE_REPORT.md]"
 ```
-- Claude plans → Gemini optimizes → Nano Banana Pro renders → Claude reviews (score ≥ 9)
+- The executor plans → Gemini optimizes → Nano Banana Pro renders → the executor reviews (score ≥ 9)
 - Best for: qualitative method illustrations, natural-style diagrams, result grids
 - Output: `figures/ai_generated/*.png`
 - Requires `GEMINI_API_KEY` environment variable
@@ -169,7 +188,7 @@ Invoke `/paper-write` to generate section-by-section LaTeX:
 - Clean stale files from previous section structures
 - Automated bib cleaning (remove uncited entries)
 - De-AI polish (remove "delve", "pivotal", "landscape"...)
-- GPT-5.4 reviews each section for quality
+- The reviewer agent reviews each section for quality
 
 **Output:** `paper/` directory with `main.tex`, `sections/*.tex`, `references.bib`, `math_commands.tex`.
 
@@ -222,7 +241,7 @@ Shall I proceed with the improvement loop?
 ```
 if paper contains \begin{theorem} or \begin{lemma} or \begin{proof}:
     Run /proof-checker "paper/"
-    This invokes GPT-5.4 xhigh to:
+    This invokes the reviewer agent (category: most-capable) to:
     - Verify all proof steps (hypothesis discharge, interchange justification, etc.)
     - Check for logic gaps, quantifier errors, missing domination conditions
     - Attempt counterexamples on key lemmas
@@ -265,9 +284,9 @@ Invoke `/auto-paper-improvement-loop` to polish the paper:
 
 **What this does (2 rounds):**
 
-**Round 1:** GPT-5.4 xhigh reviews the full paper → identifies CRITICAL/MAJOR/MINOR issues → Claude Code implements fixes → recompile → save `main_round1.pdf`
+**Round 1:** The reviewer agent (category: most-capable) reviews the full paper → identifies CRITICAL/MAJOR/MINOR issues → the executor implements fixes → recompile → save `main_round1.pdf`
 
-**Round 2:** GPT-5.4 xhigh re-reviews with conversation context → identifies remaining issues → Claude Code implements fixes → recompile → save `main_round2.pdf`
+**Round 2:** The reviewer agent (category: most-capable) re-reviews with conversation context → identifies remaining issues → the executor implements fixes → recompile → save `main_round2.pdf`
 
 **Typical improvements:**
 - Fix assumption-model mismatches

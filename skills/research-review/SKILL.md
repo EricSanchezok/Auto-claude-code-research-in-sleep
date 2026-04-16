@@ -1,28 +1,19 @@
 ---
 name: research-review
-description: Get a deep critical review of research from GPT via Codex MCP. Use when user says "review my research", "help me review", "get external review", or wants critical feedback on research ideas, papers, or experimental results.
+description: Get a deep critical review of research. Use when user says "review my research", "help me review", "get external review", or wants critical feedback on research ideas, papers, or experimental results.
 argument-hint: [topic-or-scope]
-allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Agent, mcp__codex__codex, mcp__codex__codex-reply
+allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Agent, Task
 ---
 
-# Research Review via Codex MCP (xhigh reasoning)
+# Research Review via Reviewer Agent
 
-Get a multi-round critical review of research work from an external LLM with maximum reasoning depth.
+Get a multi-round critical review of research work from an external reviewer agent with maximum reasoning depth.
 
 ## Constants
 
-- REVIEWER_MODEL = `gpt-5.4` — Model used via Codex MCP. Must be an OpenAI model (e.g., `gpt-5.4`, `o3`, `gpt-4o`)
-- **REVIEWER_BACKEND = `codex`** — Default: Codex MCP (xhigh). Override with `— reviewer: oracle-pro` for GPT-5.4 Pro via Oracle MCP. See `shared-references/reviewer-routing.md`.
+- See `shared-references/reviewer-routing.md` for routing options.
 
 ## Context: $ARGUMENTS
-
-## Prerequisites
-
-- **Codex MCP Server** configured in Claude Code:
-  ```bash
-  claude mcp add codex -s user -- codex mcp-server
-  ```
-- This gives Claude Code access to `mcp__codex__codex` and `mcp__codex__codex-reply` tools
 
 ## Workflow
 
@@ -33,12 +24,12 @@ Before calling the external reviewer, compile a comprehensive briefing:
 3. Identify: core claims, methodology, key results, known weaknesses
 
 ### Step 2: Initial Review (Round 1)
-Send a detailed prompt with xhigh reasoning:
+Send a detailed prompt to the reviewer agent:
 
 ```
-mcp__codex__codex:
-  config: {"model_reasoning_effort": "xhigh"}
-  prompt: |
+task(
+  subagent_type="reviewer",
+  prompt="""
     [Full research context + specific questions]
     Please act as a senior ML reviewer (NeurIPS/ICML level). Identify:
     1. Logical gaps or unjustified claims
@@ -46,10 +37,12 @@ mcp__codex__codex:
     3. Narrative weaknesses
     4. Whether the contribution is sufficient for a top venue
     Please be brutally honest.
+  """
+)
 ```
 
 ### Step 3: Iterative Dialogue (Rounds 2-N)
-Use `mcp__codex__codex-reply` with the returned `threadId` to continue the conversation:
+Each `task()` call is stateless, so include full context (prior review results, your responses, and follow-up questions) in every prompt:
 
 For each round:
 1. **Respond** to criticisms with evidence/counterarguments
@@ -81,12 +74,10 @@ Update project memory/notes with key review conclusions.
 
 ## Key Rules
 
-- ALWAYS use `config: {"model_reasoning_effort": "xhigh"}` for reviews
-- Send comprehensive context in Round 1 — the external model cannot read your files
+- Send comprehensive context in every `task()` call — the reviewer agent cannot read your files directly
 - Be honest about weaknesses — hiding them leads to worse feedback
 - Push back on criticisms you disagree with, but accept valid ones
 - Focus on ACTIONABLE feedback — "what experiment would fix this?"
-- Document the threadId for potential future resumption
 - The review document should be self-contained (readable without the conversation)
 
 ## Prompt Templates
@@ -108,4 +99,4 @@ Update project memory/notes with key review conclusions.
 
 ## Review Tracing
 
-After each `mcp__codex__codex` or `mcp__codex__codex-reply` reviewer call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).
+After each `task(subagent_type="reviewer")` call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).

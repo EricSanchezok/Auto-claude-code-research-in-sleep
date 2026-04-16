@@ -2,7 +2,7 @@
 name: experiment-bridge
 description: "Workflow 1.5: Bridge between idea discovery and auto review. Reads EXPERIMENT_PLAN.md, implements experiment code, deploys to GPU, collects initial results. Use when user says \"实现实验\", \"implement experiments\", \"bridge\", \"从计划到跑实验\", \"deploy the plan\", or has an experiment plan ready to execute."
 argument-hint: [experiment-plan-path-or-topic]
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, Skill, mcp__codex__codex, mcp__codex__codex-reply
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, Task, Skill
 ---
 
 # Workflow 1.5: Experiment Bridge
@@ -15,14 +15,14 @@ This skill bridges Workflow 1 (idea discovery + method refinement) and Workflow 
 
 ```
 Workflow 1 output:                    This skill:                                    Workflow 2 input:
-refine-logs/EXPERIMENT_PLAN.md   →   implement → GPT-5.4 review → deploy → collect → initial results ready
+refine-logs/EXPERIMENT_PLAN.md   →   implement → reviewer review → deploy → collect → initial results ready
 refine-logs/EXPERIMENT_TRACKER.md     code        (cross-model)    /run-experiment     for /auto-review-loop
 refine-logs/FINAL_PROPOSAL.md
 ```
 
 ## Constants
 
-- **CODE_REVIEW = true** — GPT-5.4 xhigh reviews experiment code before deployment. Catches logic bugs before wasting GPU hours. Set `false` to skip.
+- **CODE_REVIEW = true** — The reviewer checks experiment code before deployment. Catches logic bugs before wasting GPU hours. Set `false` to skip.
 - **AUTO_DEPLOY = true** — Automatically deploy experiments after implementation + review. Set `false` to manually inspect code before deploying.
 - **SANITY_FIRST = true** — Run the sanity-stage experiment first (smallest, fastest) before launching the rest. Catches setup bugs early.
 - **MAX_PARALLEL_RUNS = 4** — Maximum number of experiments to deploy in parallel (limited by available GPUs).
@@ -106,11 +106,10 @@ For each milestone (in order), write the experiment scripts:
 
 **Skip this step if `CODE_REVIEW` is `false`.**
 
-Before deploying, send the experiment code to GPT-5.4 xhigh for review:
+Before deploying, send the experiment code to the reviewer for review:
 
 ```
-mcp__codex__codex:
-  config: {"model_reasoning_effort": "xhigh"}
+task(subagent_type="reviewer"):
   prompt: |
     Review the following experiment implementation for correctness.
 
@@ -137,7 +136,7 @@ mcp__codex__codex:
 **On review results:**
 - **No CRITICAL issues** → proceed to Phase 3
 - **CRITICAL issues found** → fix them, then re-submit for review (max 2 rounds)
-- **Codex MCP unavailable** → skip silently, proceed to Phase 3 (graceful degradation)
+- **Reviewer unavailable** → skip silently, proceed to Phase 3 (graceful degradation)
 
 ### Phase 3: Sanity Check (if SANITY_FIRST = true)
 
@@ -163,9 +162,9 @@ If sanity fails → **auto-debug before giving up** (max 3 attempts):
    - CUDA error → check GPU availability, reduce model size
    - NaN/divergence → reduce learning rate, check data preprocessing
 3. **Fix and re-run** — apply the fix, re-run sanity
-4. **Attempt 2+ still failing? → Call in Codex rescue** (if Codex plugin installed):
-   Before the next retry, invoke `/codex:rescue` to get a second opinion on the root cause. Codex independently reads the code and error logs — it may spot issues Claude missed (wrong tensor shapes, subtle import shadowing, config mismatches, etc.). Apply its suggested fix, then re-run.
-   - If `/codex:rescue` is not available (plugin not installed), continue with Claude's own diagnosis
+4. **Attempt 2+ still failing? → Call in rescue review** (if reviewer available):
+   Before the next retry, invoke a reviewer task to get a second opinion on the root cause. The reviewer independently reads the code and error logs — it may spot issues the executor missed (wrong tensor shapes, subtle import shadowing, config mismatches, etc.). Apply its suggested fix, then re-run.
+   - If the reviewer is not available, continue with the executor's own diagnosis
 5. **Still failing after 3 attempts?** → stop, report the failure with all attempted fixes and error logs. Do not proceed with broken code.
 
 > Never give up on the first failure. Most experiment crashes are fixable without human intervention.

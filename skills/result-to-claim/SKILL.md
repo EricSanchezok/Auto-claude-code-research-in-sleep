@@ -1,13 +1,13 @@
 ---
 name: result-to-claim
-description: Use when experiments complete to judge what claims the results support, what they don't, and what evidence is still missing. Codex MCP evaluates results against intended claims and routes to next action (pivot, supplement, or confirm). Use after experiments finish — before writing the paper or running ablations.
+description: Use when experiments complete to judge what claims the results support, what they don't, and what evidence is still missing. A reviewer evaluates results against intended claims and routes to next action (pivot, supplement, or confirm). Use after experiments finish — before writing the paper or running ablations.
 argument-hint: [experiment-description-or-wandb-run]
-allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, mcp__codex__codex, mcp__codex__codex-reply
+allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Task
 ---
 
 # Result-to-Claim Gate
 
-Experiments produce numbers; this gate decides what those numbers *mean*. Collect results from available sources, get a Codex judgment, then auto-route based on the verdict.
+Experiments produce numbers; this gate decides what those numbers *mean*. Collect results from available sources, get a reviewer judgment, then auto-route based on the verdict.
 
 ## Context: $ARGUMENTS
 
@@ -35,13 +35,12 @@ Assemble the key information:
 - The intended claim these experiments were designed to test
 - Any known confounds or caveats
 
-### Step 2: Codex Judgment
+### Step 2: Reviewer Judgment
 
-Send the collected results to Codex for objective evaluation:
+Send the collected results to the reviewer for objective evaluation:
 
 ```
-mcp__codex__codex:
-  config: {"model_reasoning_effort": "xhigh"}
+task(subagent_type="reviewer"):
   prompt: |
     RESULT-TO-CLAIM EVALUATION
 
@@ -76,7 +75,7 @@ mcp__codex__codex:
 
 ### Step 3: Parse and Normalize
 
-Extract structured fields from Codex response:
+Extract structured fields from the reviewer response:
 
 ```markdown
 - claim_supported: yes | partial | no
@@ -100,7 +99,7 @@ if EXPERIMENT_AUDIT.json exists:
 
     if integrity_status == "fail":
         append to verdict: "[INTEGRITY CONCERN] — audit found issues, see EXPERIMENT_AUDIT.md"
-        downgrade confidence to "low" regardless of Codex judgment
+        downgrade confidence to "low" regardless of reviewer judgment
 
     if integrity_status == "warn":
         append to verdict: "[INTEGRITY: WARN] — audit flagged potential issues"
@@ -178,13 +177,13 @@ if research-wiki/ exists:
 
 ## Rules
 
-- **Codex is the judge, not CC.** CC collects evidence and routes; Codex evaluates. This prevents post-hoc rationalization.
-- Do not inflate claims beyond what the data supports. If Codex says "partial", do not round up to "yes".
+- **The reviewer is the judge, not the executor.** The executor collects evidence and routes; the reviewer evaluates. This prevents post-hoc rationalization.
+- Do not inflate claims beyond what the data supports. If the reviewer says "partial", do not round up to "yes".
 - A single positive result on one dataset does not support a general claim. Be honest about scope.
 - If `confidence` is low, treat the judgment as inconclusive and add experiments rather than committing to a claim.
-- If Codex MCP is unavailable (call fails), CC makes its own judgment and marks it `[pending Codex review]` — do not block the pipeline.
+- If the reviewer is unavailable (task fails), the executor makes its own judgment and marks it `[pending reviewer review]` — do not block the pipeline.
 - Always record the verdict and reasoning in findings.md, regardless of outcome.
 
 ## Review Tracing
 
-After each `mcp__codex__codex` or `mcp__codex__codex-reply` reviewer call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).
+After each reviewer task call, save the trace following `shared-references/review-tracing.md`. Write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).

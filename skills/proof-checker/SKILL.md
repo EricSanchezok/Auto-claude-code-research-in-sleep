@@ -1,8 +1,8 @@
 ---
 name: proof-checker
-description: Rigorous mathematical proof verification and fixing workflow. Reads a LaTeX proof, identifies gaps via cross-model review (Codex GPT-5.4 xhigh), fixes each gap with full derivations, re-reviews, and generates an audit report. Use when user says "检查证明", "verify proof", "proof check", "审证明", "check this proof", or wants rigorous mathematical verification of a theory paper.
+description: Rigorous mathematical proof verification and fixing workflow. Reads a LaTeX proof, identifies gaps via cross-model review, fixes each gap with full derivations, re-reviews, and generates an audit report. Use when user says "检查证明", "verify proof", "proof check", "审证明", "check this proof", or wants rigorous mathematical verification of a theory paper.
 argument-hint: [path-to-tex-file or proof-description]
-allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Agent, mcp__codex__codex, mcp__codex__codex-reply
+allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Agent, Task
 ---
 
 # Proof Checker: Rigorous Mathematical Verification & Fixing
@@ -14,8 +14,7 @@ Systematically verify a mathematical proof via cross-model adversarial review, f
 ## Constants
 
 - MAX_REVIEW_ROUNDS = 3
-- REVIEWER_MODEL = `gpt-5.4` via Codex MCP, reasoning effort always `xhigh`
-- **REVIEWER_BACKEND = `codex`** — Default: Codex MCP (xhigh). Override with `— reviewer: oracle-pro` for GPT-5.4 Pro via Oracle MCP. See `shared-references/reviewer-routing.md`.
+- REVIEWER_CATEGORY = `most-capable` — task category for the reviewer, always most-capable
 - AUDIT_DOC: `PROOF_AUDIT.md` in project root (cumulative log)
 - REPORT_TEX: `proof_audit_report.tex` (formal before/after PDF)
 - STATE_FILE: `PROOF_CHECK_STATE.json` (for recovery)
@@ -175,13 +174,12 @@ h_act = Θ(κ^α)  [as κ→0, uniform in π on compact subsets of Π_K, for fix
 ```
 Flag any statement where limit order is ambiguous or uniformity is unclear.
 
-### Phase 1: First Review (Codex GPT-5.4 xhigh)
+### Phase 1: First Review (cross-model reviewer)
 
-Submit the **complete proof content** with the following **mandatory reviewer checklist** in the prompt:
+Submit the **complete proof content** to the reviewer via `task()` with the following **mandatory reviewer checklist** in the prompt:
 
 ```
-mcp__codex__codex:
-  config: {"model_reasoning_effort": "xhigh"}
+task(subagent_type="reviewer"):
   prompt: |
     You are performing a rigorous mathematical proof review. For EVERY theorem,
     lemma, and proposition, check ALL of the following:
@@ -221,7 +219,7 @@ mcp__codex__codex:
     [FULL PROOF CONTENT HERE]
 ```
 
-**Save the threadId.** Parse into structured issue list. Write to `PROOF_AUDIT.md`.
+**Parse the review result** into structured issue list. Write to `PROOF_AUDIT.md`.
 
 ### Phase 1.5: Counterexample Red Team
 
@@ -290,9 +288,9 @@ Log this choice — it is a scope-changing decision when it alters theorem state
 pdflatex -interaction=nonstopmode <file>.tex 2>&1 | grep -E "Error|Warning|undefined"
 ```
 
-### Phase 3: Re-Review (Codex GPT-5.4 xhigh)
+### Phase 3: Re-Review (cross-model reviewer)
 
-Use `codex-reply` with saved threadId. Include fix summaries. Request the same mandatory checklist.
+Submit a **new** `task(subagent_type="reviewer")` call with the **complete current proof content** plus fix summaries. Include the full proof context each round (stateless calls). Request the same mandatory checklist.
 
 Check acceptance gate. If not met, repeat Phases 2-3 (up to MAX_REVIEW_ROUNDS).
 
@@ -308,11 +306,10 @@ After all fixes, verify the proof as a whole:
 - **No silent assumption strengthening**: Any fix that strengthened assumptions has propagated to the main theorem statement.
 
 #### Independent second review for FATAL/CRITICAL fixes
-For any fix that resolved a FATAL or CRITICAL issue, submit the **fixed section alone** (without showing the previous critique) to a **fresh Codex thread**:
+For any fix that resolved a FATAL or CRITICAL issue, submit the **fixed section alone** (without showing the previous critique) to a **fresh reviewer task**:
 
 ```
-mcp__codex__codex:
-  config: {"model_reasoning_effort": "xhigh"}
+task(subagent_type="reviewer"):
   prompt: |
     Blind review of the following proof section. You have NOT seen any prior
     review or discussion. Check every step for correctness, hidden assumptions,
@@ -358,7 +355,6 @@ Write `PROOF_CHECK_STATE.json`:
 {
   "status": "completed",
   "rounds": 2,
-  "threadId": "...",
   "fatal_fixed": 0,
   "critical_fixed": 3,
   "major_fixed": 2,
@@ -383,10 +379,9 @@ Write `PROOF_CHECK_STATE.json`:
 - **No silent assumption strengthening**: Any fix that adds conditions must propagate to the theorem statement.
 
 ### Cross-model protocol
-- **Claude analyzes, Codex reviews**: Claude reads proof, formulates questions, implements fixes. Codex provides adversarial review.
-- **Codex reasoning always xhigh**: Never downgrade.
-- **Send full content**: Don't summarize — send actual math for line-by-line checking.
-- **Preserve threadId**: Use `codex-reply` for follow-up rounds.
+- **The executor analyzes, the reviewer reviews**: The executor reads proof, formulates questions, implements fixes. The reviewer provides adversarial review via `task(subagent_type="reviewer")`.
+- **Reviewer category always most-capable**: Never downgrade.
+- **Send full content**: Don't summarize — send actual math for line-by-line checking. Each `task()` call is stateless, so include the complete proof context every round.
 
 ### Fix quality
 - **Minimal fixes**: Fix exactly what's broken, nothing more.

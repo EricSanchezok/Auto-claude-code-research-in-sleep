@@ -1,8 +1,8 @@
 ---
 name: auto-review-loop-minimax
-description: Autonomous multi-round research review loop using MiniMax API. Use when you want to use MiniMax instead of Codex MCP for external review. Trigger with "auto review loop minimax" or "minimax review".
+description: Autonomous multi-round research review loop using MiniMax API. Use when you want to use MiniMax for external review. Trigger with "auto review loop minimax" or "minimax review".
 argument-hint: [topic-or-scope]
-allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Agent, Skill
+allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Agent, Skill, Task
 ---
 
 # Auto Review Loop (MiniMax Version): Autonomous Research Improvement
@@ -52,9 +52,9 @@ curl -s "https://api.minimax.io/v1/chat/completions" \
   }'
 ```
 
-**API Key**: Read from `~/.claude/settings.json` under `env.MINIMAX_API_KEY`, or from environment variable.
+**API Key**: Read from environment variable `MINIMAX_API_KEY`.
 
-**Why MiniMax instead of Codex MCP?** Codex CLI uses OpenAI's Responses API (`/v1/responses`) which is not supported by third-party providers. See: https://github.com/openai/codex/discussions/7782
+**Why MiniMax?** MiniMax provides an alternative review backend via its OpenAI-compatible API, useful when you want a different model perspective for external review.
 
 ## State Persistence (Compact Recovery)
 

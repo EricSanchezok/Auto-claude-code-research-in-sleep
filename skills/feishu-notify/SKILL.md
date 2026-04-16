@@ -13,11 +13,11 @@ Send a notification: **$ARGUMENTS**
 
 This skill provides Feishu/Lark integration for ARIS. It is designed as an **internal utility** — other skills call it at key events (experiment done, review scored, checkpoint waiting). It can also be invoked manually.
 
-**Zero-impact guarantee**: If no `feishu.json` config exists, this skill does nothing and returns silently. All existing workflows are completely unaffected.
+**Zero-impact guarantee**: If no feishu notification config exists, this skill does nothing and returns silently. All existing workflows are completely unaffected.
 
 ## Configuration
 
-The skill reads `~/.claude/feishu.json`. If this file does not exist, **all Feishu functionality is disabled** — skills behave exactly as before.
+The skill reads the feishu notification config (`feishu.json`). If this file does not exist, **all Feishu functionality is disabled** — skills behave exactly as before.
 
 ### Config Format
 
@@ -45,7 +45,7 @@ The skill reads `~/.claude/feishu.json`. If this file does not exist, **all Feis
 ### Step 1: Read Config
 
 ```bash
-cat ~/.claude/feishu.json 2>/dev/null
+cat feishu.json 2>/dev/null || cat ~/.config/feishu.json 2>/dev/null
 ```
 
 - **File not found** → return silently, do nothing
@@ -120,7 +120,7 @@ Other skills should use this pattern to send notifications:
 ```markdown
 ### Feishu Notification (if configured)
 
-Check if `~/.claude/feishu.json` exists and mode is not "off":
+Check if the feishu notification config (`feishu.json`) exists and mode is not "off":
 - If **push** mode: send webhook notification with event summary
 - If **interactive** mode: send notification and wait for user reply
 - If **off** or file absent: skip entirely (no-op)

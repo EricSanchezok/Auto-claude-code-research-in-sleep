@@ -209,7 +209,7 @@ Check process is running and GPU is allocated.
 
 ### Step 6: Feishu Notification (if configured)
 
-After deployment is verified, check `~/.claude/feishu.json`:
+After deployment is verified, check the feishu notification config:
 - Send `experiment_done` notification: which experiments launched, which GPUs, estimated time
 - If config absent or mode `"off"`: skip entirely (no-op)
 

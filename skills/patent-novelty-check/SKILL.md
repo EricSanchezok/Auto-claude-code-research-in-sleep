@@ -2,7 +2,7 @@
 name: patent-novelty-check
 description: "Assess patent novelty and non-obviousness against prior art. Use when user says \"专利查新\", \"patent novelty\", \"可专利性评估\", \"patentability check\", or wants to evaluate if an invention is patentable."
 argument-hint: [invention-description-or-brief-path]
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, WebSearch, WebFetch, mcp__codex__codex
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, WebSearch, WebFetch, Task
 ---
 
 # Patent Novelty and Non-Obviousness Check
@@ -13,7 +13,6 @@ Adapted from `/novelty-check` for patent legal standards. Research novelty is NO
 
 ## Constants
 
-- `REVIEWER_MODEL = gpt-5.4` — Model used via Codex MCP for cross-model examiner verification
 - `NOVELTY_STANDARD = patent` — Always use legal patentability standard, not research contribution standard
 
 ## Inputs
@@ -76,11 +75,10 @@ Format as a matrix:
 
 ### Step 4: Cross-Model Examiner Verification
 
-Call `REVIEWER_MODEL` via `mcp__codex__codex` with xhigh reasoning:
+Call the reviewer via `task(subagent_type="reviewer", category="most-capable")`:
 
 ```
-mcp__codex__codex:
-  config: {"model_reasoning_effort": "xhigh"}
+task(subagent_type="reviewer"):
   prompt: |
     You are a senior patent examiner at the [USPTO/CNIPA/EPO].
     Examine the following invention for patentability.
@@ -133,7 +131,7 @@ Write `patent/NOVELTY_ASSESSMENT.md`:
 [combination analysis with motivation to combine]
 
 ### Cross-Model Examiner Review
-[summary of GPT-5.4 examiner feedback]
+[summary of reviewer examiner feedback]
 
 ### Recommended Claim Amendments
 [If claims need modification to overcome prior art, suggest specific amendments]
@@ -149,4 +147,4 @@ Write `patent/NOVELTY_ASSESSMENT.md`:
 - Obviousness requires BOTH: (1) a combination of references AND (2) a motivation to combine them.
 - Never assume the invention is patentable just because no identical patent exists.
 - The assessment is advisory only -- actual prosecution may reveal different prior art.
-- If `mcp__codex__codex` is not available, skip cross-model examiner review and note it in the output.
+- If the cross-model reviewer task is not available, skip cross-model examiner review and note it in the output.

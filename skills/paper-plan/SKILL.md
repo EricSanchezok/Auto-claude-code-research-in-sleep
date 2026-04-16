@@ -2,7 +2,7 @@
 name: paper-plan
 description: "Generate a structured paper outline from review conclusions and experiment results. Use when user says \"写大纲\", \"paper outline\", \"plan the paper\", \"论文规划\", or wants to create a paper plan before writing."
 argument-hint: [topic-or-narrative-doc]
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, WebSearch, WebFetch, mcp__codex__codex, mcp__codex__codex-reply
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, WebSearch, WebFetch, Task
 ---
 
 # Paper Plan: From Review Conclusions to Paper Outline
@@ -11,7 +11,7 @@ Generate a structured, section-by-section paper outline from: **$ARGUMENTS**
 
 ## Constants
 
-- **REVIEWER_MODEL = `gpt-5.4`** — Model used via Codex MCP for outline review. Must be an OpenAI model.
+- Reviewer routing is configured via `shared-references/reviewer-routing.md`.
 - **TARGET_VENUE = `ICLR`** — Default venue. User can override (e.g., `/paper-plan "topic" — venue: NeurIPS`). Supported: `ICLR`, `NeurIPS`, `ICML`, `CVPR`, `ACL`, `AAAI`, `ACM`, `IEEE_JOURNAL` (IEEE Transactions / Letters), `IEEE_CONF` (IEEE conferences).
 - **MAX_PAGES** — Page limit. For ML conferences: main body to Conclusion end (excluding references, appendix). ICLR=9, NeurIPS=9, ICML=8. **For IEEE venues: references ARE included in page count.** IEEE journal Transactions ≈ 12-14 pages total, Letters ≈ 4-5 pages total; IEEE conference ≈ 5-8 pages total (including references).
 
@@ -205,14 +205,12 @@ For each section, list required citations:
 3. Flag any citation you're unsure about with `[VERIFY]`
 4. Prefer published versions over arXiv preprints when available
 
-### Step 6: Cross-Review with REVIEWER_MODEL
+### Step 6: Cross-Review with Reviewer Agent
 
-Send the complete outline to GPT-5.4 xhigh for feedback:
+Send the complete outline to the reviewer agent (category: most-capable) for feedback:
 
 ```
-mcp__codex__codex:
-  model: gpt-5.4
-  config: {"model_reasoning_effort": "xhigh"}
+task(subagent_type="reviewer"):
   prompt: |
     Review this paper outline for a [VENUE] submission.
     [full outline including Claims-Evidence Matrix]

@@ -2,7 +2,7 @@
 name: paper-slides
 description: "Generate conference presentation slides (beamer LaTeX → PDF + editable PPTX) from a compiled paper, with speaker notes and full talk script. Use when user says \"做PPT\", \"做幻灯片\", \"make slides\", \"conference talk\", \"presentation slides\", \"生成slides\", \"写演讲稿\", or wants beamer slides for a conference talk."
 argument-hint: [paper-directory-or-talk-length]
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, mcp__codex__codex, mcp__codex__codex-reply
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, Task
 ---
 
 # Paper Slides: From Paper to Conference Talk
@@ -24,7 +24,7 @@ Unlike posters (single page, visual-first), slides tell a **temporal story**: ea
 - **SPEAKER_NOTES = true** — Generate `\note{}` blocks in beamer and corresponding PPTX notes. Set `false` for clean slides without notes.
 - **PAPER_DIR = `paper/`** — Directory containing the compiled paper.
 - **OUTPUT_DIR = `slides/`** — Output directory for all slide files.
-- **REVIEWER_MODEL = `gpt-5.4`** — Model used via Codex MCP for slide review.
+- **REVIEWER_ROUTING** — Reviewer routing is configured via `shared-references/reviewer-routing.md`.
 - **AUTO_PROCEED = false** — At each checkpoint, **always wait for explicit user confirmation**.
 - **COMPILER = `latexmk`** — LaTeX build tool.
 - **ENGINE = `pdflatex`** — LaTeX engine. Use `xelatex` for CJK text.
@@ -62,7 +62,6 @@ Persist state to `slides/SLIDES_STATE.json` after each phase:
   "venue": "NeurIPS",
   "talk_type": "spotlight",
   "slide_count": 10,
-  "codex_thread_id": "019cfcf4-...",
   "status": "in_progress",
   "timestamp": "2026-03-18T15:00:00"
 }
@@ -314,13 +313,12 @@ If page count differs significantly from outline (>2 slides off), investigate.
 
 **State**: Write `SLIDES_STATE.json` with `phase: 4`.
 
-### Phase 5: Codex MCP Review
+### Phase 5: Reviewer Agent Review
 
-Send the slide outline + selected LaTeX frames to GPT-5.4 xhigh:
+Send the slide outline + selected LaTeX frames to the reviewer agent (category: most-capable):
 
 ```
-mcp__codex__codex:
-  config: {"model_reasoning_effort": "xhigh"}
+task(subagent_type="reviewer"):
   prompt: |
     Review this [TALK_TYPE] presentation ([TALK_MINUTES] min) for [VENUE].
 
@@ -348,7 +346,7 @@ mcp__codex__codex:
 
 Apply fixes. Recompile if LaTeX was changed.
 
-> ⚠️ If `mcp__codex__codex` is not available (no OpenAI API key), skip external review and proceed to Phase 6. Note the skip in `SLIDES_STATE.json`.
+> ⚠️ If the reviewer agent is not available, skip external review and proceed to Phase 6. Note the skip in `SLIDES_STATE.json`.
 
 Save review to `slides/SLIDES_REVIEW.md`.
 
@@ -523,7 +521,7 @@ The paper and code are available at the QR code on screen. I'm happy to take que
   ├── main.pdf              # Compiled slides (primary output)
   ├── presentation.pptx     # Editable PowerPoint
   ├── SLIDE_OUTLINE.md      # Slide-by-slide outline
-  ├── SLIDES_REVIEW.md      # GPT-5.4 review feedback
+  ├── SLIDES_REVIEW.md      # Reviewer agent feedback
   ├── speaker_notes.md      # Per-slide speaker notes
   ├── TALK_SCRIPT.md        # Full word-for-word talk script + Q&A
   ├── SLIDES_STATE.json     # State persistence
@@ -551,7 +549,7 @@ Next steps:
 - **Do NOT hallucinate citations.** Reference only papers cited in the paper.
 - **Opening hook matters**: Never start with "In this paper, we..." — start with the problem or a provocative question.
 - **Font size minimums**: Title ≥28pt, body ≥20pt, footnotes ≥14pt.
-- **Feishu notifications are optional.** If `~/.claude/feishu.json` exists, send notifications. If absent, skip.
+- **Feishu notifications are optional.** If feishu notification config exists, send notifications. If absent, skip.
 
 ## Parameter Pass-Through
 

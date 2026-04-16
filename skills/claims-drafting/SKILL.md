@@ -2,7 +2,7 @@
 name: claims-drafting
 description: "Draft patent claims for an invention. Use when user says \"撰写权利要求\", \"draft claims\", \"写权利要求书\", \"claim drafting\", or wants to create patent claims. The core skill of the patent pipeline."
 argument-hint: [invention-disclosure-path]
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, WebSearch, WebFetch, mcp__codex__codex, mcp__codex__codex-reply
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, WebSearch, WebFetch, Task
 ---
 
 # Claims Drafting: The Core Patent Skill
@@ -13,7 +13,7 @@ This is the most critical skill in the patent pipeline. Claims define the legal 
 
 ## Constants
 
-- `REVIEWER_MODEL = gpt-5.4` — External examiner for claim quality review
+- `REVIEWER_MODEL` — External examiner for claim quality review (via reviewer task)
 - `MAX_CLAIM_REVISION_ROUNDS = 3` — Maximum revision iterations
 - `CLAIM_STYLE = "auto"` — `US` (Jepson or open), `EP` (two-part mandatory), `CN` (two-part), `auto` (detect from jurisdiction)
 - `MIN_INDEPENDENT_CLAIMS = 2` — Typically method + system. For utility model (实用新型): apparatus/device only, NO method claims.
@@ -132,11 +132,10 @@ If any element lacks specification support, add it to the specification requirem
 
 ### Step 5: Cross-Model Examiner Review
 
-Call `REVIEWER_MODEL` via `mcp__codex__codex` with xhigh reasoning:
+Call the reviewer via `task(subagent_type="reviewer", category="most-capable")`:
 
 ```
-mcp__codex__codex:
-  config: {"model_reasoning_effort": "xhigh"}
+task(subagent_type="reviewer"):
   prompt: |
     You are a senior patent examiner at the [USPTO/CNIPA/EPO].
     Review the following patent claims for quality and patentability.
@@ -172,7 +171,7 @@ If the examiner review identifies issues:
 1. Address all CRITICAL issues (anticipation, obviousness, indefiniteness)
 2. Address MAJOR issues (scope too narrow, missing support, weak fallbacks)
 3. Consider MINOR issues (antecedent basis, formatting)
-4. Re-submit to examiner for round 2 (use `mcp__codex__codex` with threadId)
+4. Re-submit to the reviewer for round 2 (via a follow-up `task(subagent_type="reviewer", ...)`)
 5. Repeat up to `MAX_CLAIM_REVISION_ROUNDS` times
 
 ### Step 7: Output
@@ -223,4 +222,4 @@ Write `patent/CLAIMS.md`:
 - Never include result-to-be-achieved language in claims ("configured to achieve high accuracy").
 - Never fabricate claim language -- every element must come from the actual invention.
 - If drafting for ALL jurisdictions, produce separate claim sets for CN, US, and EP.
-- If `mcp__codex__codex` is not available, skip cross-model examiner review and note it in the output.
+- If the cross-model reviewer task is not available, skip cross-model examiner review and note it in the output.

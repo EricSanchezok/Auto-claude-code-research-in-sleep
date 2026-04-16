@@ -2,7 +2,7 @@
 name: grant-proposal
 description: "Draft a structured grant proposal from research ideas and literature. Supports KAKENHI (Japan), NSF (US), NSFC (China, including 面上/青年/优青/杰青/海外优青/重点), ERC (EU), DFG (Germany), SNSF (Switzerland), ARC (Australia), NWO (Netherlands), and generic formats. Use when user says \"write grant\", \"grant proposal\", \"申請書\", \"write KAKENHI\", \"科研費\", \"基金申请\", \"写基金\", \"NSF proposal\", or wants to turn research ideas into a funding application."
 argument-hint: [research-direction — grant-type]
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Agent, Skill, mcp__codex__codex, mcp__codex__codex-reply
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Agent, Skill, Task
 ---
 
 # Grant Proposal: From Research Ideas to Fundable Application
@@ -34,7 +34,7 @@ Grant proposals argue for **future work** (feasibility + potential), not complet
 
 - **GRANT_TYPE = `KAKENHI`** — Default grant type. Supported: `KAKENHI`, `NSF`, `NSFC`, `ERC`, `DFG`, `SNSF`, `ARC`, `NWO`, `GENERIC`. Override via argument (e.g., `/grant-proposal "topic — NSF"`).
 - **GRANT_SUBTYPE = `auto`** — Sub-type within the grant agency. Examples: KAKENHI `Start-up`/`Wakate`/`Kiban-B`; NSFC `Youth`/`Excellent-Youth`/`Distinguished`/`Overseas`/`Key`; NSF `CAREER`/`CRII`/`Standard`. Auto-detected from argument or defaults to the most common sub-type.
-- **REVIEWER_MODEL = `gpt-5.4`** — Model used via Codex MCP for proposal review. Must be an OpenAI model (e.g., `gpt-5.4`, `o3`, `gpt-4o`).
+- **REVIEWER_MODEL = `default`** — Model used by the reviewer subagent for proposal review.
 - **OUTPUT_FORMAT = `markdown`** — Output format. Supported: `markdown`, `latex`. LaTeX uses grant-specific templates when available.
 - **MAX_REVIEW_ROUNDS = 2** — Maximum external review-revise cycles before finalizing.
 - **OUTPUT_DIR = `grant-proposal/`** — Directory for generated proposal files.
@@ -135,7 +135,6 @@ Grant proposal drafting is a long task that may trigger context compaction. Pers
   "grant_type": "KAKENHI",
   "grant_subtype": "Start-up",
   "language": "Japanese",
-  "codex_thread_id": "019cfcf4-...",
   "gap_statement": "...",
   "aims_count": 3,
   "status": "in_progress",
@@ -290,7 +289,7 @@ Timeline: [timeline]
 ```
 
 **What this does:**
-- GPT-5.4 xhigh acts as a grant review panelist (not a paper reviewer)
+- The reviewer subagent acts as a grant review panelist (not a paper reviewer)
 - Evaluates aims independence, narrative arc, risk identification, timeline realism
 - Identifies the single biggest reviewer concern
 - Provides actionable fixes ranked by severity
@@ -306,7 +305,7 @@ Apply structural feedback before proceeding to drafting.
 - Aim 2: [title] — Risk: MEDIUM
 - Aim 3: [title] — Risk: LOW
 - Timeline: [summary]
-- Reviewer feedback: [key points from GPT-5.4]
+- Reviewer feedback: [key points from the reviewer]
 
 Proceed to section drafting? Or adjust the structure?
 ```
@@ -319,7 +318,7 @@ Options for the user:
 - Reply **"back"** → return to Phase 1 to adjust the gap/positioning
 - Reply **"stop"** → save current structure to `grant-proposal/DRAFT_NOTES.md`
 
-**State**: Write `GRANT_STATE.json` with `phase: 2`, aims summary, and Codex threadId.
+**State**: Write `GRANT_STATE.json` with `phase: 2` and aims summary.
 
 ### Phase 3: Section Drafting
 
@@ -419,22 +418,20 @@ Invoke `/research-review` on the complete draft for grant-type-specific evaluati
 ```
 
 **What this does:**
-- GPT-5.4 xhigh acts as a grant review panelist
+- The reviewer subagent acts as a grant review panelist
 - Scores each section 1-5 using agency-specific criteria
 - Identifies fatal flaws and recommends funding/revisions/rejection
 - Provides ranked action items for improvement
 - All feedback saved to `grant-proposal/GRANT_REVIEW.md`
 
-> ⚠️ **Codex MCP fallback**: If `mcp__codex__codex` is not available (no OpenAI API key), skip external review. Note "External review skipped — no Codex MCP available. Consider running `/auto-review-loop-llm` separately." in GRANT_REVIEW.md. The proposal is still usable without external review.
+> ⚠️ **Reviewer fallback**: If the reviewer subagent is not available, skip external review. Note "External review skipped — no reviewer available. Consider running `/auto-review-loop-llm` separately." in GRANT_REVIEW.md. The proposal is still usable without external review.
 
-If `/research-review` is invoked (preferred), it handles the Codex call internally. If calling Codex directly (e.g., to maintain thread context from Phase 2):
+If `/research-review` is invoked (preferred), it handles the reviewer call internally. If calling the reviewer directly (e.g., for continuity from Phase 2):
 
 #### Round 1 (full draft review):
 
 ```
-mcp__codex__codex-reply:
-  threadId: [from Phase 2]
-  config: {"model_reasoning_effort": "xhigh"}
+task(subagent_type="reviewer"):
   prompt: |
     Review this complete [GRANT_TYPE] [GRANT_SUBTYPE] proposal draft.
 
@@ -461,9 +458,7 @@ mcp__codex__codex-reply:
 If MAX_REVIEW_ROUNDS > 1 and revisions were applied:
 
 ```
-mcp__codex__codex-reply:
-  threadId: [saved from Round 1]
-  config: {"model_reasoning_effort": "xhigh"}
+task(subagent_type="reviewer"):
   prompt: |
     [Round N review of revised [GRANT_TYPE] [GRANT_SUBTYPE] proposal]
 
@@ -487,7 +482,7 @@ Parse reviewer feedback into severity levels:
 - **MAJOR** — significant weaknesses. Fix before submission.
 - **MINOR** — suggestions for improvement. Fix if time allows.
 
-Implement CRITICAL and MAJOR fixes. If MAX_REVIEW_ROUNDS > 1, re-submit for another round via `mcp__codex__codex-reply`.
+Implement CRITICAL and MAJOR fixes. If MAX_REVIEW_ROUNDS > 1, re-submit for another round via the reviewer subagent.
 
 #### 5.2 Generate Output
 
@@ -541,7 +536,7 @@ Before declaring done:
 - Language: [language]
 - Aims: [N] aims covering [summary]
 - Timeline: [N] years
-- Review score: [summary from GPT-5.4]
+- Review score: [summary from the reviewer]
 - Output: grant-proposal/GRANT_PROPOSAL.md
 
 Files saved to grant-proposal/. Please review and customize:
@@ -568,7 +563,7 @@ What would you like to do next?
 - **Preliminary data de-risks.** Include any pilot results, existing datasets, or prior publications that demonstrate feasibility.
 - **Reviewer-facing structure.** Bold key sentences. Use numbered lists for clarity. Make the reviewer's job easy.
 - **Cultural norms matter.** KAKENHI expects 社会的意義; NSF expects Broader Impacts; NSFC expects 国际前沿 positioning. Missing these is a red flag for reviewers.
-- **Feishu notifications are optional.** If `~/.claude/feishu.json` exists, send `checkpoint` at each phase transition and `pipeline_done` at final output. If absent, skip silently.
+- **Feishu notifications are optional.** If the feishu notification config exists, send `checkpoint` at each phase transition and `pipeline_done` at final output. If absent, skip silently.
 
 ## Parameter Pass-Through
 
@@ -587,7 +582,7 @@ Parameters can be passed inline with `—` separator. They flow to sub-skills wh
 | `max review rounds` | 2 | External review cycles | — |
 | `sources` | all | Literature sources | → `/research-lit` |
 | `arxiv download` | false | Download arXiv PDFs | → `/research-lit` |
-| `reviewer model` | gpt-5.4 | Codex review model | → Codex MCP |
+| `reviewer model` | default | Reviewer subagent model | → reviewer subagent |
 | `auto proceed` | false | Skip checkpoints | — |
 
 ## Composing with Other Skills

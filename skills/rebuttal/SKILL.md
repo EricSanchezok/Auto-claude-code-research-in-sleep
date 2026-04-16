@@ -2,7 +2,7 @@
 name: rebuttal
 description: "Workflow 4: Submission rebuttal pipeline. Parses external reviews, enforces coverage and grounding, drafts a safe text-only rebuttal under venue limits, and manages follow-up rounds. Use when user says \"rebuttal\", \"reply to reviewers\", \"ICML rebuttal\", \"OpenReview response\", or wants to answer external reviews safely."
 argument-hint: [paper-path-or-review-bundle]
-allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Agent, Skill, mcp__codex__codex, mcp__codex__codex-reply
+allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Agent, Skill, Task
 ---
 
 # Workflow 4: Rebuttal
@@ -40,10 +40,9 @@ Workflow 4:   rebuttal (post-submission external reviews)
 
 - **VENUE = `ICML`** — Default venue. Override if needed.
 - **RESPONSE_MODE = `TEXT_ONLY`** — v1 default.
-- **REVIEWER_MODEL = `gpt-5.4`** — Used via Codex MCP for internal stress-testing.
-- **REVIEWER_BACKEND = `codex`** — Default: Codex MCP (xhigh). Override with `— reviewer: oracle-pro` for GPT-5.4 Pro via Oracle MCP. See `shared-references/reviewer-routing.md`.
+- **REVIEWER_MODEL = `default`** — Used by the reviewer subagent for internal stress-testing.
 - **MAX_INTERNAL_DRAFT_ROUNDS = 2** — draft → lint → revise.
-- **MAX_STRESS_TEST_ROUNDS = 1** — One Codex MCP critique round.
+- **MAX_STRESS_TEST_ROUNDS = 1** — One reviewer subagent critique round.
 - **MAX_FOLLOWUP_ROUNDS = 3** — per reviewer thread.
 - **AUTO_EXPERIMENT = false** — When `true`, automatically invoke `/experiment-bridge` to run supplementary experiments when the strategy plan identifies reviewer concerns that require new empirical evidence. When `false` (default), pause and present the evidence gap to the user for manual handling.
 - **QUICK_MODE = false** — When `true`, only run Phase 0-3 (parse reviews, atomize concerns, build strategy). Outputs `ISSUE_BOARD.md` + `STRATEGY_PLAN.md` and stops — no drafting, no stress test. Useful for quickly understanding what reviewers want before deciding how to respond.
@@ -211,11 +210,10 @@ Run all lints:
 5. **Consistency** — no contradictions across reviewer replies
 6. **Limit** — exact character count, compress if over (redundancy → friendly → opener → wording, never drop critical answers)
 
-### Phase 6: Codex MCP Stress Test
+### Phase 6: Reviewer Stress Test
 
 ```
-mcp__codex__codex:
-  config: {"model_reasoning_effort": "xhigh"}
+task(subagent_type="reviewer"):
   prompt: |
     Stress-test this rebuttal draft:
     [raw reviews + issue board + draft + venue rules]
@@ -230,7 +228,7 @@ mcp__codex__codex:
     Verdict: safe to submit / needs revision
 ```
 
-Save full response to `rebuttal/MCP_STRESS_TEST.md`. If hard safety blocker → revise before finalizing.
+Save full response to `rebuttal/STRESS_TEST.md`. If hard safety blocker → revise before finalizing.
 
 ### Phase 7: Finalize — Two Versions
 
@@ -264,7 +262,7 @@ When new reviewer comments arrive:
 3. Draft **delta reply only** (not full rewrite)
 4. Update `rebuttal/REVISION_PLAN.md` in place — add any new checklist items introduced by the follow-up, tick off items the author has already completed, and keep existing items' status current
 5. Re-run safety lints
-6. Use Codex MCP reply for continuity if useful
+6. Use reviewer subagent for continuity if useful
 7. Rules: escalate technically not rhetorically; concede if reviewer is correct; stop arguing if reviewer is immovable and no new evidence exists
 
 ## Key Rules
@@ -273,7 +271,7 @@ When new reviewer comments arrive:
 - **Never fabricate.** No invented evidence, numbers, derivations, citations, or links.
 - **Never overpromise.** Only promise what user explicitly approved.
 - **Full coverage.** Every reviewer concern tracked and accounted for.
-- **Preserve raw records.** Reviews and MCP outputs stored verbatim.
+- **Preserve raw records.** Reviews and reviewer outputs stored verbatim.
 - **Global + per-reviewer structure.** Shared concerns in opener.
 - **Answer friendly reviewers too.** Reinforce supportive framing.
 - **Meta-reviewer closing.** Summarize resolved/remaining/why accept.
@@ -286,4 +284,4 @@ When new reviewer comments arrive:
 
 ## Review Tracing
 
-After each `mcp__codex__codex` or `mcp__codex__codex-reply` reviewer call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).
+After each reviewer `task()` call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).

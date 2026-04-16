@@ -12,7 +12,7 @@ Research topic: $ARGUMENTS
 ## Constants
 
 
-- **REVIEWER_BACKEND = `codex`** — Default: Codex MCP (xhigh). Override with `— reviewer: oracle-pro` for GPT-5.4 Pro via Oracle MCP. See `shared-references/reviewer-routing.md`.
+
 - **PAPER_LIBRARY** — Local directory containing user's paper collection (PDFs). Check these paths in order:
   1. `papers/` in the current project directory
   2. `literature/` in the current project directory
@@ -145,7 +145,7 @@ Locate the fetch script and search arXiv directly:
 # Try to find arxiv_fetch.py
 SCRIPT=$(find tools/ -name "arxiv_fetch.py" 2>/dev/null | head -1)
 # If not found, check ARIS install
-[ -z "$SCRIPT" ] && SCRIPT=$(find ~/.claude/skills/arxiv/ -name "arxiv_fetch.py" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && SCRIPT=$(find ~/.claude/skills/arxiv/ ~/.synergy/config/skills/arxiv/ -name "arxiv_fetch.py" 2>/dev/null | head -1)
 
 # Search arXiv API for structured results (title, abstract, authors, categories)
 python3 "$SCRIPT" search "QUERY" --max 10
@@ -161,7 +161,7 @@ When the user explicitly requests `— sources: semantic-scholar` (or `— sourc
 
 ```bash
 S2_SCRIPT=$(find tools/ -name "semantic_scholar_fetch.py" 2>/dev/null | head -1)
-[ -z "$S2_SCRIPT" ] && S2_SCRIPT=$(find ~/.claude/skills/semantic-scholar/ -name "semantic_scholar_fetch.py" 2>/dev/null | head -1)
+[ -z "$S2_SCRIPT" ] && S2_SCRIPT=$(find ~/.claude/skills/semantic-scholar/ ~/.synergy/config/skills/semantic-scholar/ -name "semantic_scholar_fetch.py" 2>/dev/null | head -1)
 
 # Search for published CS/Engineering papers with quality filters
 python3 "$S2_SCRIPT" search "QUERY" --max 10 \

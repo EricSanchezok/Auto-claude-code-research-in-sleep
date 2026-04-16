@@ -2,7 +2,7 @@
 name: novelty-check
 description: Verify research idea novelty against recent literature. Use when user says "查新", "novelty check", "有没有人做过", "check novelty", or wants to verify a research idea is novel before implementing.
 argument-hint: [method-or-idea-description]
-allowed-tools: WebSearch, WebFetch, Grep, Read, Glob, mcp__codex__codex
+allowed-tools: WebSearch, WebFetch, Grep, Read, Glob, Task
 ---
 
 # Novelty Check Skill
@@ -11,7 +11,7 @@ Check whether a proposed method/idea has already been done in the literature: **
 
 ## Constants
 
-- REVIEWER_MODEL = `gpt-5.4` — Model used via Codex MCP. Must be an OpenAI model (e.g., `gpt-5.4`, `o3`, `gpt-4o`)
+(No model-specific constants — the reviewer agent is used via task() delegation.)
 
 ## Instructions
 
@@ -41,14 +41,14 @@ For EACH core claim, search using ALL available sources:
 3. **Read abstracts**: For each potentially overlapping paper, WebFetch its abstract and related work section
 
 ### Phase C: Cross-Model Verification
-Call REVIEWER_MODEL via Codex MCP (`mcp__codex__codex`) with xhigh reasoning:
+Call the reviewer agent via task() delegation:
 ```
-config: {"model_reasoning_effort": "xhigh"}
+task(subagent_type="reviewer"):
+  prompt: |
+    [The proposed method description]
+    [All papers found in Phase B]
+    Is this method novel? What is the closest prior work? What is the delta?
 ```
-Prompt should include:
-- The proposed method description
-- All papers found in Phase B
-- Ask: "Is this method novel? What is the closest prior work? What is the delta?"
 
 ### Phase D: Novelty Report
 Output a structured report:
@@ -87,4 +87,4 @@ Output a structured report:
 
 ## Review Tracing
 
-After each `mcp__codex__codex` or `mcp__codex__codex-reply` reviewer call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).
+After each `task(subagent_type="reviewer")` call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).

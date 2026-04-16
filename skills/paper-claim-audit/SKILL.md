@@ -2,7 +2,7 @@
 name: paper-claim-audit
 description: "Zero-context verification that every number, comparison, and scope claim in the paper matches raw result files. Uses a fresh cross-model reviewer with NO prior context to prevent confirmation bias. Use when user says \"审查论文数据\", \"check paper claims\", \"verify numbers\", \"论文数字核对\", or before submission to ensure paper-to-evidence fidelity."
 argument-hint: [paper-directory]
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, mcp__codex__codex
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, Task
 ---
 
 # Paper Claim Audit: Zero-Context Evidence Verification
@@ -46,7 +46,7 @@ This is **stricter than reviewer-independence** — it's zero-context evidence a
 
 ## Workflow
 
-### Step 1: Collect Files (Executor — Claude)
+### Step 1: Collect Files (Executor)
 
 Locate paper and result files WITHOUT reading or interpreting them.
 
@@ -73,14 +73,12 @@ NARRATIVE_REPORT.md, PAPER_PLAN.md, findings.md
 Any .md file that is an executor-written summary
 ```
 
-### Step 2: Fresh Reviewer Audit (GPT-5.4 — NEW thread, no reply)
+### Step 2: Fresh Reviewer Audit (Reviewer Agent — NEW task, stateless)
 
-**CRITICAL: Use `mcp__codex__codex` (new thread), NEVER `mcp__codex__codex-reply`.** Every run must be a fresh context.
+**CRITICAL: Use `task(subagent_type="auditor")` for each run. Each task is stateless with zero prior context.**
 
 ```
-mcp__codex__codex:
-  model: gpt-5.4
-  config: {"model_reasoning_effort": "xhigh"}
+task(subagent_type="auditor"):
   prompt: |
     You are a paper-to-evidence auditor. You have ZERO prior context about
     this research. You will receive only paper source files and raw result
@@ -152,7 +150,7 @@ mcp__codex__codex:
     Overall verdict: PASS | WARN | FAIL
 ```
 
-### Step 3: Write Report (Executor — Claude)
+### Step 3: Write Report (Executor)
 
 Parse the reviewer's response and write `PAPER_CLAIM_AUDIT.md`:
 
@@ -160,7 +158,7 @@ Parse the reviewer's response and write `PAPER_CLAIM_AUDIT.md`:
 # Paper Claim Audit Report
 
 **Date**: [today]
-**Auditor**: GPT-5.4 xhigh (fresh zero-context thread)
+**Auditor**: Reviewer agent (fresh zero-context task)
 **Paper**: [paper title from tex]
 
 ## Overall Verdict: [PASS | WARN | FAIL]
@@ -233,7 +231,7 @@ Same pattern as `/experiment-audit`:
 
 ## Key Rules
 
-- **Fresh thread EVERY run.** Never use `codex-reply`. Never carry context.
+- **Fresh task EVERY run.** Never reuse prior context. Each task() is stateless.
 - **Zero executor interpretation.** Only file paths. No summaries.
 - **Only raw results.** No EXPERIMENT_LOG, no AUTO_REVIEW, no human summaries.
 - **Rounding rule.** Only standard rounding to displayed precision. 84.7% → 84.7% or 85% is OK. 84.7% → 85.3% is NOT OK.
@@ -241,4 +239,4 @@ Same pattern as `/experiment-audit`:
 
 ## Review Tracing
 
-After each `mcp__codex__codex` or `mcp__codex__codex-reply` reviewer call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).
+After each `task(subagent_type="reviewer")` or `task(subagent_type="auditor")` call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).

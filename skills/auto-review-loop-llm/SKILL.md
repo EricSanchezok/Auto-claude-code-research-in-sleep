@@ -2,7 +2,7 @@
 name: auto-review-loop-llm
 description: Autonomous research review loop using any OpenAI-compatible LLM API. Configure via llm-chat MCP server or environment variables. Trigger with "auto review loop llm" or "llm review".
 argument-hint: [topic-or-scope]
-allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Agent, Skill
+allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Agent, Skill, Task
 ---
 
 # Auto Review Loop (Generic LLM): Autonomous Research Improvement
@@ -23,19 +23,17 @@ This skill uses **any OpenAI-compatible API** for external review via the `llm-c
 
 ### Configuration via MCP Server (Recommended)
 
-Add to `~/.claude/settings.json`:
+Configure the `llm-chat` MCP server with the following environment variables:
 
 ```json
 {
-  "mcpServers": {
-    "llm-chat": {
-      "command": "/usr/bin/python3",
-      "args": ["/Users/yourname/.claude/mcp-servers/llm-chat/server.py"],
-      "env": {
-        "LLM_API_KEY": "your-api-key",
-        "LLM_BASE_URL": "https://api.deepseek.com/v1",
-        "LLM_MODEL": "deepseek-chat"
-      }
+  "llm-chat": {
+    "command": "/usr/bin/python3",
+    "args": ["path/to/mcp-servers/llm-chat/server.py"],
+    "env": {
+      "LLM_API_KEY": "your-api-key",
+      "LLM_BASE_URL": "https://api.deepseek.com/v1",
+      "LLM_MODEL": "deepseek-chat"
     }
   }
 }

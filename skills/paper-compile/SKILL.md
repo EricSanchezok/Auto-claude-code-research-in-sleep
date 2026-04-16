@@ -120,7 +120,7 @@ For each error:
 3. Apply the fix
 4. Recompile
 
-**Stuck after 2 attempts?** If Codex plugin is installed, invoke `/codex:rescue` — Codex can independently read the LaTeX source and `compile.log` to spot issues Claude missed (e.g., conflicting packages, encoding problems, subtle macro errors). If not installed, continue with Claude's own diagnosis.
+**Stuck after 2 attempts?** Try delegating to a reviewer agent via `task(subagent_type="reviewer")` — the reviewer can independently read the LaTeX source and `compile.log` to spot issues the executor missed (e.g., conflicting packages, encoding problems, subtle macro errors). If unavailable, continue with the executor's own diagnosis.
 
 ### Step 5: Post-Compilation Checks
 

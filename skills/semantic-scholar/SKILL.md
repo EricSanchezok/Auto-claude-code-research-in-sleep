@@ -64,7 +64,7 @@ Locate the fetch script:
 
 ```bash
 SCRIPT=$(find tools/ -name "semantic_scholar_fetch.py" 2>/dev/null | head -1)
-[ -z "$SCRIPT" ] && SCRIPT=$(find ~/.claude/skills/semantic-scholar/ -name "semantic_scholar_fetch.py" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && SCRIPT=$(find ~/.claude/skills/semantic-scholar/ ~/.synergy/config/skills/semantic-scholar/ -name "semantic_scholar_fetch.py" 2>/dev/null | head -1)
 ```
 
 **Standard search** (default — relevance-ranked):

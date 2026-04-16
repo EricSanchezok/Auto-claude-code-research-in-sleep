@@ -14,7 +14,7 @@ Default: `balanced` (current behavior, zero change for existing users).
 
 | Setting | Value | Why |
 |---------|-------|-----|
-| Codex reasoning_effort | **xhigh** | Reviewer quality is non-negotiable |
+| Reviewer task category | **most-capable** | Reviewer quality is non-negotiable |
 | DBLP/CrossRef citations | **on** | Citation integrity is non-negotiable |
 | Reviewer independence | **on** | Cross-model protocol is non-negotiable |
 | Experiment integrity | **on** | Fraud prevention is non-negotiable |
@@ -117,7 +117,7 @@ Adjust constants:
 Every skill should print its effort configuration at the start:
 
 ```
-⚡ [effort: max] papers=25, ideas=16, rounds=6 | Codex: xhigh (always)
+⚡ [effort: max] papers=25, ideas=16, rounds=6 | reviewer: most-capable (always)
 ```
 
 ## Precedence

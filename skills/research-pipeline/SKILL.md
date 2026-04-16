@@ -2,7 +2,7 @@
 name: research-pipeline
 description: "Full research pipeline: Workflow 1 (idea discovery) → implementation → Workflow 2 (auto review loop) → Workflow 3 (paper writing, optional). Goes from a broad research direction all the way to a polished PDF. Use when user says \"全流程\", \"full pipeline\", \"从找idea到投稿\", \"end-to-end research\", or wants the complete autonomous research lifecycle."
 argument-hint: [research-direction]
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Agent, Skill, mcp__codex__codex, mcp__codex__codex-reply
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Agent, Skill, Task
 ---
 
 # Full Research Pipeline: Idea → Experiments → Submission
@@ -14,7 +14,7 @@ End-to-end autonomous research workflow for: **$ARGUMENTS**
 - **AUTO_PROCEED = true** — When `true`, Gate 1 auto-selects the top-ranked idea (highest pilot signal + novelty confirmed) and continues to implementation. When `false`, always waits for explicit user confirmation before proceeding.
 - **ARXIV_DOWNLOAD = false** — When `true`, `/research-lit` downloads the top relevant arXiv PDFs during literature survey. When `false` (default), only fetches metadata via arXiv API. Passed through to `/idea-discovery` → `/research-lit`.
 - **HUMAN_CHECKPOINT = false** — When `true`, the auto-review loops (Stage 4) pause after each round's review to let you see the score and provide custom modification instructions before fixes are implemented. When `false` (default), loops run fully autonomously. Passed through to `/auto-review-loop`.
-- **REVIEWER_DIFFICULTY = medium** — How adversarial the reviewer is. `medium` (default): standard MCP review. `hard`: adds reviewer memory + debate protocol. `nightmare`: GPT reads repo directly via `codex exec` + memory + debate. Passed through to `/auto-review-loop`.
+- **REVIEWER_DIFFICULTY = medium** — How adversarial the reviewer is. `medium` (default): standard cross-model review. `hard`: adds reviewer memory + debate protocol. `nightmare`: the reviewer reads repo directly + memory + debate. Passed through to `/auto-review-loop`.
 - **AUTO_WRITE = false** — When `true`, automatically invoke Workflow 3 (`/paper-writing`) after Stage 5. Requires `VENUE` to be set. When `false` (default), Stage 5 generates `NARRATIVE_REPORT.md` and stops — user invokes `/paper-writing` manually.
 - **VENUE = ICLR** — Target venue for paper writing (Stage 6). Only used when `AUTO_WRITE=true`. Options: `ICLR`, `NeurIPS`, `ICML`, `CVPR`, `ACL`, `AAAI`, `ACM`, `IEEE_CONF`, `IEEE_JOURNAL`.
 
@@ -30,6 +30,25 @@ This skill chains the entire research lifecycle into a single pipeline:
 ```
 
 It orchestrates up to three major workflows plus the implementation bridge between them. Workflow 3 (paper writing) is optional and controlled by `AUTO_WRITE`.
+
+## DAG Orchestration
+
+When running in Synergy, this pipeline benefits from DAG-based task tracking. The natural dependency structure:
+
+```
+dagwrite({ nodes: [
+  { id: "lit-survey",      content: "Literature survey via /research-lit",      status: "pending", deps: [] },
+  { id: "idea-gen",        content: "Generate ideas via /idea-creator",         status: "pending", deps: ["lit-survey"] },
+  { id: "novelty-check",   content: "Verify novelty via /novelty-check",       status: "pending", deps: ["idea-gen"] },
+  { id: "refine",          content: "Refine proposal via /research-refine",    status: "pending", deps: ["novelty-check"] },
+  { id: "experiment-plan", content: "Plan experiments via /experiment-plan",    status: "pending", deps: ["refine"] },
+  { id: "implement",       content: "Implement and run via /experiment-bridge", status: "pending", deps: ["experiment-plan"] },
+  { id: "review-loop",     content: "Auto review loop via /auto-review-loop",  status: "pending", deps: ["implement"] },
+  { id: "paper",           content: "Write paper via /paper-writing",           status: "pending", deps: ["review-loop"] }
+]})
+```
+
+The executor can track progress through the DAG and report status at each transition. If running without DAG support, the linear workflow below still works identically.
 
 ## Pipeline
 
@@ -121,8 +140,8 @@ Once initial results are in, start the autonomous improvement loop:
 ```
 
 **What this does (up to 4 rounds):**
-1. GPT-5.4 xhigh reviews the work (score, weaknesses, minimum fixes)
-2. Claude Code implements fixes (code changes, new experiments, reframing)
+1. The reviewer reviews the work (score, weaknesses, minimum fixes)
+2. The executor implements fixes (code changes, new experiments, reframing)
 3. Deploy fixes, collect new results
 4. Re-review → repeat until score ≥ 6/10 or 4 rounds reached
 

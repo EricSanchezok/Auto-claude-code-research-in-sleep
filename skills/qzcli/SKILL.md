@@ -21,14 +21,11 @@ cd qzcli_tool && pip install -e .
 
 ### MCP Integration (optional)
 
-To use qzcli as an MCP tool directly from Claude Code or Codex:
+To use qzcli as an MCP tool:
 
 ```bash
-# Claude Code
-claude mcp add qzcli -- qzcli-mcp
-
-# Codex
-codex mcp add qzcli -- qzcli-mcp
+# Add as an MCP server in your platform's config
+qzcli-mcp
 ```
 
 ---

@@ -124,14 +124,12 @@ Open the SVG/PDF and check:
 
 If issues found, edit the JSON spec (never the generated SVG) and re-render.
 
-### Step 5: Iterate with Codex Review (Optional, for High-Stakes Figures)
+### Step 5: Iterate with Reviewer Agent Review (Optional, for High-Stakes Figures)
 
 For paper architecture figures, invoke cross-model review:
 
 ```
-mcp__codex__codex:
-  model: gpt-5.4
-  config: {"model_reasoning_effort": "xhigh"}
+task(subagent_type="reviewer"):
   prompt: |
     Review this SVG figure for a technical paper (architecture / workflow diagram).
 
@@ -218,4 +216,4 @@ Three-stage horizontal cascade with inputs feeding in from top, outputs exiting 
 
 ## Review Tracing
 
-After each `mcp__codex__codex` or `mcp__codex__codex-reply` reviewer call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).
+After each `task(subagent_type="reviewer")` call, save the trace following `shared-references/review-tracing.md`. Use `tools/save_trace.sh` or write files directly to `.aris/traces/<skill>/<date>_run<NN>/`. Respect the `--- trace:` parameter (default: `full`).

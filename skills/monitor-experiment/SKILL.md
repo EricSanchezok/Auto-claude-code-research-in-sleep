@@ -118,7 +118,7 @@ Present results in a comparison table:
 
 ### Step 6: Feishu Notification (if configured)
 
-After results are collected, check `~/.claude/feishu.json`:
+After results are collected, check the feishu notification config:
 - Send `experiment_done` notification: results summary table, delta vs baseline
 - If config absent or mode `"off"`: skip entirely (no-op)
 

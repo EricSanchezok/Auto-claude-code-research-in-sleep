@@ -2,7 +2,7 @@
 name: paper-poster
 description: "Generate a conference poster (article + tcbposter LaTeX → A0/A1 PDF + editable PPTX + SVG) from a compiled paper. Use when user says \"做海报\", \"制作海报\", \"conference poster\", \"make poster\", \"生成poster\", \"poster session\", or wants to create a poster for a conference presentation."
 argument-hint: [paper-directory-or-venue]
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, mcp__codex__codex, mcp__codex__codex-reply
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, Task
 ---
 
 # Paper Poster: From Paper to Conference Poster
@@ -23,7 +23,7 @@ Unlike papers (dense prose, 8-15 pages), posters are **visual-first**: one page,
 - **COLUMNS = 4** — Number of content columns. Typical: 4 for landscape A0 (IMRAD), **3 for portrait A0** (research consensus), 2 for portrait A1. Portrait A0 should NEVER use 4 columns — text becomes too narrow and unreadable.
 - **PAPER_DIR = `paper/`** — Directory containing the compiled paper (main.tex + figures/).
 - **OUTPUT_DIR = `poster/`** — Output directory for all poster files.
-- **REVIEWER_MODEL = `gpt-5.4`** — Model used via Codex MCP for poster review.
+- **REVIEWER_ROUTING** — Reviewer routing is configured via `shared-references/reviewer-routing.md`.
 - **AUTO_PROCEED = false** — At each checkpoint, **always wait for explicit user confirmation**. Set `true` only if user explicitly requests fully autonomous mode.
 - **COMPILER = `latexmk`** — LaTeX build tool.
 - **ENGINE = `pdflatex`** — LaTeX engine. Use `xelatex` for CJK text.
@@ -60,7 +60,6 @@ Poster generation can be long. Persist state to `poster/POSTER_STATE.json` after
   "orientation": "landscape",
   "columns": 4,
   "figures_selected": ["architecture.pdf", "results.pdf"],
-  "codex_thread_id": "019cfcf4-...",
   "status": "in_progress",
   "timestamp": "2026-03-18T15:00:00"
 }
@@ -668,9 +667,9 @@ pdfinfo poster/main.pdf
 3. Figures are fully visible, not cut off
 4. Text is readable (zoom to 100% = actual A0 size)
 
-### Phase 5: Visual Review via Claude + Gemini (Iterative Refinement)
+### Phase 5: Visual Review via the Executor + Gemini (Iterative Refinement)
 
-> This phase uses **Claude visual assessment** on rendered poster images to iteratively refine layout, readability, and visual hierarchy — similar to the `paper-illustration` skill's review loop.
+> This phase uses **executor visual assessment** on rendered poster images to iteratively refine layout, readability, and visual hierarchy — similar to the `paper-illustration` skill's review loop.
 
 **Step 1: Render poster to PNG preview**
 
@@ -683,7 +682,7 @@ pix.save('poster/poster_review.png')
 doc.close()
 ```
 
-**Step 2: Claude visual assessment**
+**Step 2: Executor visual assessment**
 
 Read the rendered `poster/poster_review.png` and perform a **STRICT visual review** with the following rubric (score 1-10):
 
@@ -715,7 +714,7 @@ SCORE_THRESHOLD = 9
 
 for iteration in 1..MAX_ITERATIONS:
     1. Render poster to poster/poster_v{iteration}.png (200 DPI)
-    2. Claude reads the PNG and performs STRICT visual review
+    2. The executor reads the PNG and performs STRICT visual review
     3. Score the poster (1-10) with detailed feedback
     4. If score >= SCORE_THRESHOLD → PASS, proceed to Phase 6
     5. If score < SCORE_THRESHOLD:
@@ -736,7 +735,7 @@ for iteration in 1..MAX_ITERATIONS:
 For poster elements that need custom illustrations (e.g., hero architecture diagram, method workflow), use the Gemini illustration pipeline:
 1. Write a detailed specification for the illustration
 2. Call `mcp__illustrator__run` with the specification
-3. Claude reviews the generated image for accuracy
+3. The executor reviews the generated image for accuracy
 4. Iterate until score ≥ 9 or max 3 attempts
 5. Save final illustration to `poster/figures/` and embed in LaTeX
 
@@ -759,13 +758,12 @@ Append all iteration scores and feedback to `poster/POSTER_VISUAL_REVIEW.md`:
 - Decision: PASS — print-ready
 ```
 
-### Phase 6: Codex MCP Review
+### Phase 6: Reviewer Agent Review
 
-Send the poster content plan + key LaTeX sections to GPT-5.4 xhigh for review.
+Send the poster content plan + key LaTeX sections to the reviewer agent (category: most-capable) for review.
 
 ```
-mcp__codex__codex:
-  config: {"model_reasoning_effort": "xhigh"}
+task(subagent_type="reviewer"):
   prompt: |
     Review this academic conference poster for [VENUE].
 
@@ -1077,7 +1075,7 @@ Next steps:
 - **Do NOT hallucinate citations.** Use only references from the paper's bibliography.
 - **Include QR code placeholder** or code link for paper/code repository.
 - **Font size minimums (article class)**: Title ≥84pt, section headers ≥40pt, body ≥34pt, captions ≥26pt, references ≥30pt, stat numbers ≥66pt.
-- **Feishu notifications are optional.** If `~/.claude/feishu.json` exists, send notifications. Otherwise skip.
+- **Feishu notifications are optional.** If feishu notification config exists, send notifications. Otherwise skip.
 
 ## Parameter Pass-Through
 

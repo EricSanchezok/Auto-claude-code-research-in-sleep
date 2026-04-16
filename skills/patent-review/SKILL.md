@@ -2,10 +2,10 @@
 name: patent-review
 description: "Get an external patent examiner review of a patent application. Use when user says \"专利审查\", \"patent review\", \"审查意见\", \"examiner review\", or wants critical feedback on patent claims and specification."
 argument-hint: [patent-directory-or-scope]
-allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Agent, mcp__codex__codex, mcp__codex__codex-reply
+allowed-tools: Bash(*), Read, Grep, Glob, Write, Edit, Agent, Task
 ---
 
-# Patent Examiner Review via Codex MCP (xhigh reasoning)
+# Patent Examiner Review via Cross-Model Task
 
 Get a multi-round patent examiner review of the patent application based on: **$ARGUMENTS**
 
@@ -13,16 +13,8 @@ Adapted from `/research-review`. The reviewer persona is a patent examiner, not 
 
 ## Constants
 
-- `REVIEWER_MODEL = gpt-5.4` — Model used via Codex MCP
 - `REVIEW_ROUNDS = 2` — Number of review rounds
-- `EXAMINER_PERSONA = "patent-examiner"` — GPT-5.4 persona
-
-## Prerequisites
-
-- Codex MCP Server configured:
-  ```bash
-  claude mcp add codex -s user -- codex mcp-server
-  ```
+- `EXAMINER_PERSONA = "patent-examiner"` — Reviewer persona
 
 ## Inputs
 
@@ -44,11 +36,10 @@ Before calling the external reviewer, compile a comprehensive briefing:
 
 ### Step 2: Round 1 — Full Examiner Review
 
-Send to `REVIEWER_MODEL` via `mcp__codex__codex` with xhigh reasoning:
+Send to the reviewer via `task(subagent_type="reviewer", category="most-capable")`:
 
 ```
-mcp__codex__codex:
-  config: {"model_reasoning_effort": "xhigh"}
+task(subagent_type="reviewer"):
   prompt: |
     You are a senior patent examiner at the [USPTO/CNIPA/EPO].
     Examine this patent application and issue a detailed office action.
@@ -128,11 +119,10 @@ For each fix:
 
 ### Step 4: Round 2 — Follow-Up Review
 
-Use `mcp__codex__codex` with the threadId from Round 1:
+Send the revisions to the reviewer via a follow-up `task(subagent_type="reviewer", ...)`:
 
 ```
-mcp__codex__codex:
-  threadId: [from Round 1]
+task(subagent_type="reviewer"):
   prompt: |
     Here is the revised patent application after addressing your office action.
 
@@ -194,7 +184,7 @@ Write `patent/PATENT_REVIEW.md`:
 ## Key Rules
 
 - The reviewer persona must be a patent examiner, not a paper reviewer or academic.
-- Always use `model_reasoning_effort: "xhigh"` for maximum analysis depth.
+- Always use `category: "most-capable"` for maximum analysis depth.
 - Address CRITICAL and MAJOR issues before proceeding to the next phase.
 - Document all changes in the review report for traceability.
 - If the patentability score is below 5/10 after Round 2, recommend significant rework before filing.
