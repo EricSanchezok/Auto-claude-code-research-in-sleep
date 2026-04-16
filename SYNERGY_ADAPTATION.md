@@ -35,30 +35,37 @@ Everything else is preserved: workflow logic, artifact contracts (Markdown files
 ### One-click install
 
 ```bash
-# Clone and install in one step
-git clone https://github.com/EricSanchezok/Auto-claude-code-research-in-sleep.git
-cd Auto-claude-code-research-in-sleep
-bash install.sh
+curl -sL https://raw.githubusercontent.com/EricSanchezok/Auto-claude-code-research-in-sleep/main/install.sh | bash
 ```
 
-Or install directly via curl:
+The installer will:
+1. Clone the repo to `~/.synergy/aris/` (persistent, not a temp dir)
+2. Symlink all skills to `~/.synergy/config/skills/` (or copy if symlinks fail)
+3. Copy `reviewer.md` and `auditor.md` agents to `~/.synergy/config/agent/`
+4. Skip skills that already exist (won't overwrite your customizations)
+
+### Update
+
+Run the same command again — it will `git pull` the persistent clone and refresh symlinks:
 
 ```bash
 curl -sL https://raw.githubusercontent.com/EricSanchezok/Auto-claude-code-research-in-sleep/main/install.sh | bash
 ```
 
-The installer will:
-- Symlink all skills to `~/.synergy/config/skills/` (or copy if symlinks fail)
-- Copy `reviewer.md` and `auditor.md` agents to `~/.synergy/config/agent/`
-- Skip skills that already exist (won't overwrite your customizations)
+### Uninstall
 
-To uninstall: `bash install.sh --uninstall`
+```bash
+curl -sL https://raw.githubusercontent.com/EricSanchezok/Auto-claude-code-research-in-sleep/main/install.sh | bash -s -- --uninstall
+```
 
 ### Manual install
 
 If you prefer manual control:
 
 ```bash
+git clone https://github.com/EricSanchezok/Auto-claude-code-research-in-sleep.git
+cd Auto-claude-code-research-in-sleep
+
 # Skills (symlink recommended for easy git pull updates)
 ln -s "$(pwd)/skills"/* ~/.synergy/config/skills/
 

@@ -11,44 +11,43 @@ UNINSTALL=false
 SYNERGY_HOME="${SYNERGY_HOME:-$HOME/.synergy}"
 SKILLS_DIR="$SYNERGY_HOME/config/skills"
 AGENTS_DIR="$SYNERGY_HOME/config/agent"
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ARIS_REPO="https://github.com/EricSanchezok/Auto-claude-code-research-in-sleep.git"
+ARIS_DIR="$SYNERGY_HOME/aris"  # Persistent clone location
 
-# If running via curl, clone first
-if [[ ! -f "$SCRIPT_DIR/SYNERGY_ADAPTATION.md" ]]; then
-  echo "📦 Cloning ARIS for Synergy..."
-  TMPDIR=$(mktemp -d)
-  git clone --depth 1 https://github.com/EricSanchezok/Auto-claude-code-research-in-sleep.git "$TMPDIR/aris"
-  SCRIPT_DIR="$TMPDIR/aris"
-  trap 'rm -rf "$TMPDIR"' EXIT
+# Resolve script directory (works when run via curl or locally)
+SCRIPT_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd)" || true
+if [[ -f "$SCRIPT_DIR/SYNERGY_ADAPTATION.md" ]]; then
+  # Running from a local clone — use it directly
+  ARIS_DIR="$SCRIPT_DIR"
+else
+  # Running via curl or from outside the repo — clone/pull to persistent location
+  if [[ -d "$ARIS_DIR/.git" ]]; then
+    echo "🔄 Updating ARIS (git pull)..."
+    git -C "$ARIS_DIR" pull --ff-only || {
+      echo "⚠️  git pull failed. Trying fresh clone..."
+      rm -rf "$ARIS_DIR"
+      git clone --depth 1 "$ARIS_REPO" "$ARIS_DIR"
+    }
+  else
+    echo "📦 Cloning ARIS for Synergy..."
+    rm -rf "$ARIS_DIR"
+    git clone --depth 1 "$ARIS_REPO" "$ARIS_DIR"
+  fi
 fi
 
 if $UNINSTALL; then
   echo "🗑️  Uninstalling ARIS skills and agents..."
 
   # Remove skills that came from ARIS
-  if [[ -d "$SCRIPT_DIR/skills" ]]; then
-    for skill_dir in "$SCRIPT_DIR/skills"/*/; do
-      skill_name=$(basename "$skill_dir")
-      [[ "$skill_name" == shared-references ]] && continue
-      target="$SKILLS_DIR/$skill_name"
-      if [[ -L "$target" ]]; then
-        rm "$target"
-        echo "  removed symlink: $skill_name"
-      elif [[ -d "$target" ]]; then
-        # Only remove if it looks like an ARIS skill (has SKILL.md)
-        if [[ -f "$target/SKILL.md" ]]; then
-          rm -rf "$target"
-          echo "  removed: $skill_name"
-        fi
-      fi
-    done
-  fi
-
-  # Remove shared-references
-  if [[ -d "$SKILLS_DIR/shared-references" ]]; then
-    rm -rf "$SKILLS_DIR/shared-references"
-    echo "  removed: shared-references"
-  fi
+  for target in "$SKILLS_DIR"/*/; do
+    [[ -d "$target" ]] || continue
+    skill_name=$(basename "$target")
+    # Check if it's an ARIS skill (exists in the repo)
+    if [[ -d "$ARIS_DIR/skills/$skill_name" ]]; then
+      rm -rf "$target"
+      echo "  removed: $skill_name"
+    fi
+  done
 
   # Remove agents
   for agent in reviewer.md auditor.md; do
@@ -57,6 +56,12 @@ if $UNINSTALL; then
       echo "  removed agent: $agent"
     fi
   done
+
+  # Remove the persistent clone
+  if [[ -d "$ARIS_DIR" ]] && [[ "$ARIS_DIR" != "$SCRIPT_DIR" ]]; then
+    rm -rf "$ARIS_DIR"
+    echo "  removed repo: $ARIS_DIR"
+  fi
 
   echo "✅ ARIS uninstalled."
   exit 0
@@ -71,8 +76,8 @@ mkdir -p "$SKILLS_DIR" "$AGENTS_DIR"
 # Install skills (symlink if possible, copy as fallback)
 installed=0
 skipped=0
-if [[ -d "$SCRIPT_DIR/skills" ]]; then
-  for skill_dir in "$SCRIPT_DIR/skills"/*/; do
+if [[ -d "$ARIS_DIR/skills" ]]; then
+  for skill_dir in "$ARIS_DIR/skills"/*/; do
     skill_name=$(basename "$skill_dir")
     target="$SKILLS_DIR/$skill_name"
 
@@ -82,10 +87,10 @@ if [[ -d "$SCRIPT_DIR/skills" ]]; then
       continue
     fi
 
-    # Remove stale symlink
+    # Remove stale symlink from old install
     [[ -L "$target" ]] && rm "$target"
 
-    # Try symlink first (allows git pull to update)
+    # Symlink — allows updates via git pull on the persistent clone
     if ln -s "$skill_dir" "$target" 2>/dev/null; then
       echo "  🔗 $skill_name (symlinked)"
     else
@@ -97,20 +102,20 @@ if [[ -d "$SCRIPT_DIR/skills" ]]; then
 fi
 
 # Install shared-references
-if [[ -d "$SCRIPT_DIR/skills/shared-references" ]]; then
+if [[ -d "$ARIS_DIR/skills/shared-references" ]]; then
   target="$SKILLS_DIR/shared-references"
   [[ -L "$target" ]] && rm "$target"
-  if ln -s "$SCRIPT_DIR/skills/shared-references" "$target" 2>/dev/null; then
+  if ln -s "$ARIS_DIR/skills/shared-references" "$target" 2>/dev/null; then
     echo "  🔗 shared-references (symlinked)"
   else
-    cp -r "$SCRIPT_DIR/skills/shared-references" "$target"
+    cp -r "$ARIS_DIR/skills/shared-references" "$target"
     echo "  📋 shared-references (copied)"
   fi
   ((installed++)) || true
 fi
 
 # Install agents
-for agent in "$SCRIPT_DIR/agents"/*.md; do
+for agent in "$ARIS_DIR/agents"/*.md; do
   [[ -f "$agent" ]] || continue
   agent_name=$(basename "$agent")
   cp "$agent" "$AGENTS_DIR/$agent_name"
@@ -121,8 +126,5 @@ done
 echo ""
 echo "✅ Installed: $installed skills/agents ($skipped skipped — already existed)"
 echo ""
-echo "Next steps:"
-echo "  1. Reload Synergy config:  runtime_reload(target='all')"
-echo "  2. Try a workflow:         /research-pipeline \"your research direction\""
-echo ""
-echo "To uninstall:  bash install.sh --uninstall"
+echo "To update:  curl -sL https://raw.githubusercontent.com/EricSanchezok/Auto-claude-code-research-in-sleep/main/install.sh | bash"
+echo "To remove:  curl -sL https://raw.githubusercontent.com/EricSanchezok/Auto-claude-code-research-in-sleep/main/install.sh | bash -s -- --uninstall"
