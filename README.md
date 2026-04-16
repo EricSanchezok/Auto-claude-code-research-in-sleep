@@ -1,5 +1,9 @@
 # Auto-claude-code-research-in-sleep (ARIS ⚔️🌙)
 
+> 🔄 **This is a [Synergy](https://github.com/EricSanchezok/synergy)-adapted fork.** All cross-model review has been migrated from Codex MCP to Synergy's native `task()` agent delegation. [One-click install →](#-synergy-installation)
+>
+> Original upstream by [@wanshuiyin](https://github.com/wanshuiyin): [wanshuiyin/Auto-claude-code-research-in-sleep](https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep)
+
 💡 *Use ARIS in Claude Code / Cursor / Trae as a skill-based workflow, or get the full experience with the standalone CLI — enjoy any way you like!*
 
 🤖 **AI agents:** Read [`AGENT_GUIDE.md`](AGENT_GUIDE.md) instead — structured for LLM consumption, not human browsing.
@@ -1108,6 +1112,47 @@ export OPENAI_API_KEY="your-key"
 | 📝 [`alphaxiv`](skills/alphaxiv/SKILL.md) | Quick single-paper lookup via [AlphaXiv](https://alphaxiv.org) LLM-optimized summaries. Three-tier fallback: overview → full markdown → LaTeX source | No |
 | 🎨 [`pixel-art`](skills/pixel-art/SKILL.md) | Generate pixel art SVG illustrations for READMEs, docs, or slides | No |
 | 📱 [`feishu-notify`](skills/feishu-notify/SKILL.md) | [Feishu/Lark](#-feishulark-integration-optional) push (webhook) or interactive (bidirectional). Off by default | No |
+
+---
+
+## 🌊 Synergy Installation
+
+This fork adapts ARIS for [Synergy](https://github.com/EricSanchezok/synergy) — an open-source AI agent platform. It replaces Codex MCP review calls with Synergy's native `task()` agent delegation and adds DAG orchestration hints for parallel execution.
+
+**One-click install:**
+
+```bash
+curl -sL https://raw.githubusercontent.com/EricSanchezok/Auto-claude-code-research-in-sleep/main/install.sh | bash
+```
+
+Or clone and install manually:
+
+```bash
+git clone https://github.com/EricSanchezok/Auto-claude-code-research-in-sleep.git
+cd Auto-claude-code-research-in-sleep
+bash install.sh
+```
+
+After installation, reload Synergy and start using ARIS skills:
+
+```
+/research-pipeline "your research direction"
+```
+
+See [`SYNERGY_ADAPTATION.md`](SYNERGY_ADAPTATION.md) for full details on what changed and how to configure agents.
+
+<details>
+<summary>What was adapted</summary>
+
+- `mcp__codex__codex` / `codex-reply` → `task(subagent_type="reviewer")`
+- `codex exec` (nightmare mode) → `task(subagent_type="auditor")`
+- `reasoning_effort: xhigh` → `category: "most-capable"`
+- MCP threadId threading → stateless task calls
+- Removed variant dirs (skills-codex, skills-codex-gemini-review, skills-codex-claude-review)
+- Added DAG orchestration hints to pipeline skills
+- Added custom agents: reviewer, auditor
+
+</details>
 
 ---
 
