@@ -1,5 +1,12 @@
 # ARIS-Code Changelog
 
+## v0.4.3 (2026-04-17)
+
+- **Fix**: **Third-party Anthropic-compatible proxies (Bedrock, etc.) rejected beta headers** — providers that emulate the Anthropic Messages API do not recognize Anthropic-specific beta flags (`oauth-2025-04-20`, `claude-code-20250219`, `interleaved-thinking-2025-05-14`, `context-1m-2025-08-07`), causing `400 Bad Request: invalid beta flag`. Introduced `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS` env var (read via new `api::read_send_betas()`); when set, the Anthropic client omits the `anthropic-beta` header on OAuth requests. The flag is auto-enabled when a custom `executor_base_url` is configured for `anthropic` or `anthropic-compat` providers, and auto-cleared when switching back to the official API.
+- **Fix**: **Custom `executor_base_url` ignored for `anthropic` provider** — previously only the `anthropic-compat` path propagated `executor_base_url` to `ANTHROPIC_BASE_URL`. A user who selected `provider=anthropic` with a proxy URL would silently hit `api.anthropic.com` and fail with `401 Unauthorized`. Now both `anthropic` and `anthropic-compat` propagate the URL.
+
+Credit: [@screw-44](https://github.com/screw-44) ([#156](https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep/pull/156)).
+
 ## v0.4.2 (2026-04-16)
 
 - **Fix**: **Auto-compaction corrupted session after skill runs** — `assistant stream produced no content` after `[auto-compacted: removed N messages]` when the preservation window started mid-tool-chain or with a non-User message. Compaction now scans forward to the nearest User message as the boundary, avoiding dangling `tool_use`/`tool_result` pairs that caused the API to return an empty stream. Messages skipped during the forward scan are now correctly included in the summary instead of being silently dropped from both summary and tail. Symptom: after skills produced many tool calls, the next user prompt would fail; closing and reopening restored the ability to talk.
