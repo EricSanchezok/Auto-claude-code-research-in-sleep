@@ -22,10 +22,10 @@ Each phase builds on the previous one's output. The final deliverables are a val
 
 ## Constants
 
-- **PILOT_MAX_HOURS = 2** — Skip any pilot experiment estimated to take > 2 hours per GPU. Flag as "needs manual pilot" in the report.
-- **PILOT_TIMEOUT_HOURS = 3** — Hard timeout: kill any running pilot that exceeds 3 hours. Collect partial results if available.
-- **MAX_PILOT_IDEAS = 3** — Run pilots for at most 3 top ideas in parallel. Additional ideas are validated on paper only.
-- **MAX_TOTAL_GPU_HOURS = 8** — Total GPU budget across all pilots. If exceeded, skip remaining pilots and note in report.
+- **PILOT_MAX_HOURS = 3** — Skip any pilot experiment estimated to take > 3 hours per GPU. Flag as "needs manual pilot" in the report.
+- **PILOT_TIMEOUT_HOURS = 4** — Hard timeout: kill any running pilot that exceeds 4 hours. Collect partial results if available.
+- **MAX_PILOT_IDEAS = 4** — Run pilots for at most 4 top ideas in parallel. Additional ideas are validated on paper only.
+- **MAX_TOTAL_GPU_HOURS = 16** — Total GPU budget across all pilots. If exceeded, skip remaining pilots and note in report.
 - **AUTO_PROCEED = true** — If user doesn't respond at a checkpoint, automatically proceed with the best option after presenting results. Set to `false` to always wait for explicit user confirmation.
 - **REVIEWER_MODEL** — Reviewer agent used via task() delegation. Passed to sub-skills.
 - **OUTPUT_DIR = `idea-stage/`** — All idea-stage outputs go here. Create the directory if it doesn't exist.

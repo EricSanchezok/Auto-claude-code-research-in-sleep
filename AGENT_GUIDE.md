@@ -31,7 +31,11 @@ Workflow-specific:
 — difficulty: medium | hard | nightmare      # reviewer adversarial level
 — venue: ICLR | NeurIPS | ICML | ...        # target venue
 — sources: web, zotero, deepxiv, ...        # literature sources
-— gpu: local | remote | vast | modal         # GPU backend
+— gpu: local | remote | vast | modal | qzcli  # compute backend
+— baseline_alignment: true | false           # verify results before full deploy (default: true)
+— parallel_deploy: true | false              # parallel experiment scheduling (default: true)
+— baseline_tolerance: 0.15                   # allowed baseline deviation (default: 15%)
+— catastrophic_threshold: 0.50               # method < baseline × this → likely bug (default: 0.50)
 ```
 
 Parameters pass through workflow chains automatically.
@@ -40,7 +44,7 @@ Parameters pass through workflow chains automatically.
 
 ### Full Pipeline
 ```
-/research-pipeline "direction" → W1 → W1.5 → W2 → W3
+/research-pipeline "direction" → W1 → W1.5 → W1.6 → W1.7 → W2 → W3
 ```
 
 ### Individual Workflows
@@ -49,6 +53,8 @@ Parameters pass through workflow chains automatically.
 |----------|--------|-------|--------|-------------|
 | W1: Idea Discovery | `/idea-discovery "direction"` | research direction | IDEA_REPORT.md, EXPERIMENT_PLAN.md | Starting new research |
 | W1.5: Experiment Bridge | `/experiment-bridge` | EXPERIMENT_PLAN.md | running code, EXPERIMENT_LOG.md | Have a plan, need to implement |
+| W1.6: Baseline Alignment | `/baseline-alignment` | EXPERIMENT_PLAN.md | BASELINE_ALIGNMENT.md | Verify results plausible before full deploy |
+| W1.7: Parallel Deploy | `/parallel-experiment-engine` | EXPERIMENT_PLAN.md | PARALLEL_PLAN.md | Multi-backend parallel experiment scheduling |
 | W2: Auto Review | `/auto-review-loop "scope"` | paper + results | improved paper | Iterative improvement |
 | W3: Paper Writing | `/paper-writing "NARRATIVE_REPORT.md"` | narrative report | paper/main.pdf | Ready to write |
 | W4: Rebuttal | `/rebuttal "paper/ + reviews"` | paper + reviews | PASTE_READY.txt | Reviews received |
@@ -63,6 +69,8 @@ Parameters pass through workflow chains automatically.
 | `/novelty-check "idea"` | Novelty verification | Checks against existing work |
 | `/research-review "draft"` | External review | GPT-5.4 xhigh deep critique |
 | `/experiment-audit` | Integrity check | Cross-model audit of eval code |
+| `/baseline-alignment` | Baseline alignment | Verify results plausible before full deployment |
+| `/parallel-experiment-engine` | Parallel deployment | Multi-backend parallel experiment scheduling |
 | `/result-to-claim` | Verdict judgment | Codex judges if claims are supported |
 | `/paper-plan "topic"` | Outline creation | Structured outline + claims matrix |
 | `/paper-figure "plan"` | Figure generation | Plots from experiment data |
@@ -87,6 +95,9 @@ Skills communicate through plain-text files:
 | `paper/main.pdf` | paper-compile | auto-paper-improvement-loop |
 | `EXPERIMENT_AUDIT.md` | experiment-audit | result-to-claim |
 | `EXPERIMENT_AUDIT.json` | experiment-audit | result-to-claim (machine-readable) |
+| `BASELINE_ALIGNMENT.md` | baseline-alignment | auto-review-loop, experiment-audit |
+| `BASELINE_ALIGNMENT.json` | baseline-alignment | auto-review-loop (machine-readable) |
+| `PARALLEL_PLAN.md` | parallel-experiment-engine | monitor-experiment |
 | `research-wiki/` | research-wiki | idea-creator, research-lit, result-to-claim |
 | `.aris/meta/events.jsonl` | hooks (passive) | meta-optimize |
 

@@ -14,9 +14,9 @@ Implement and deploy experiments from plan: **$ARGUMENTS**
 This skill bridges Workflow 1 (idea discovery + method refinement) and Workflow 2 (auto review loop). It takes the experiment plan and turns it into running experiments with initial results.
 
 ```
-Workflow 1 output:                    This skill:                                    Workflow 2 input:
-refine-logs/EXPERIMENT_PLAN.md   →   implement → reviewer review → deploy → collect → initial results ready
-refine-logs/EXPERIMENT_TRACKER.md     code        (cross-model)    /run-experiment     for /auto-review-loop
+Workflow 1 output:                    This skill:                                                             Workflow 2 input:
+refine-logs/EXPERIMENT_PLAN.md   →   implement → code review → sanity → baseline alignment → deploy → collect → results ready
+refine-logs/EXPERIMENT_TRACKER.md     code       (cross-model)  (crash?) (results plausible?)  (parallel)   for /auto-review-loop
 refine-logs/FINAL_PROPOSAL.md
 ```
 
@@ -25,11 +25,12 @@ refine-logs/FINAL_PROPOSAL.md
 - **CODE_REVIEW = true** — The reviewer checks experiment code before deployment. Catches logic bugs before wasting GPU hours. Set `false` to skip.
 - **AUTO_DEPLOY = true** — Automatically deploy experiments after implementation + review. Set `false` to manually inspect code before deploying.
 - **SANITY_FIRST = true** — Run the sanity-stage experiment first (smallest, fastest) before launching the rest. Catches setup bugs early.
-- **MAX_PARALLEL_RUNS = 4** — Maximum number of experiments to deploy in parallel (limited by available GPUs).
+- **BASELINE_ALIGNMENT = true** — After sanity check, verify baseline can be reproduced and method results are plausible. Blocks full deployment on failure. Set `false` to skip (not recommended).
+- **PARALLEL_DEPLOY = true** — Deploy experiments in parallel using `/parallel-experiment-engine` instead of serial `/run-experiment`. Set `false` for serial deployment.
 - **BASE_REPO = false** — GitHub repo URL to use as base codebase. When set, clone the repo first and implement experiments on top of it. When `false` (default), write code from scratch or reuse existing project files.
 - **COMPACT = false** — When `true`, (1) read `idea-stage/IDEA_CANDIDATES.md` instead of full `idea-stage/IDEA_REPORT.md` if available, (2) append experiment results to `EXPERIMENT_LOG.md` after collection.
 
-> Override: `/experiment-bridge "EXPERIMENT_PLAN.md" — compact: true, base repo: https://github.com/org/project`
+> Override: `/experiment-bridge "EXPERIMENT_PLAN.md" — compact: true, baseline_alignment: false, parallel_deploy: false, base repo: https://github.com/org/project`
 
 ## Inputs
 
@@ -169,16 +170,58 @@ If sanity fails → **auto-debug before giving up** (max 3 attempts):
 
 > Never give up on the first failure. Most experiment crashes are fixable without human intervention.
 
+### Phase 3.5: Baseline Alignment (if BASELINE_ALIGNMENT = true)
+
+**Skip this step if `BASELINE_ALIGNMENT` is `false`.**
+
+After the sanity check confirms the code runs without crashing, verify that **results are plausible** before deploying the full experiment suite:
+
+```
+/baseline-alignment "refine-logs/EXPERIMENT_PLAN.md"
+```
+
+This skill:
+
+1. **Runs the baseline** experiment on a small scale (single seed)
+2. **Compares baseline results** against known published numbers — if the baseline can't be reproduced, the data pipeline or evaluation logic has a bug
+3. **Runs a small-scale method** experiment
+4. **Checks for catastrophic results** — if method scores below 50% of baseline, it's almost certainly a code bug, not a weak algorithm
+5. **Auto-debugs** common issues (wrong data split, wrong metric, detached gradients, etc.) up to 3 rounds
+
+**Gate result:**
+
+- ✅ **OPEN** — baseline aligned, method plausible → proceed to Phase 4
+- ❌ **BLOCKED** — baseline can't be reproduced or method is catastrophically low → **do not deploy full experiments**; fix bugs first
+
+Report is written to `refine-logs/BASELINE_ALIGNMENT.md` and `refine-logs/BASELINE_ALIGNMENT.json`.
+
+> This gate prevents the most common failure mode: deploying a full experiment suite on code with a subtle bug that produces results like 10% on a 60% baseline. The bug is only caught much later in `/auto-review-loop`, after GPU hours have been wasted.
+
 ### Phase 4: Deploy Full Experiments
 
-Deploy experiments following the plan's milestone order:
+Deploy experiments following the plan's milestone order.
+
+**If `PARALLEL_DEPLOY = true`** (recommended), use `/parallel-experiment-engine`:
+
+```
+/parallel-experiment-engine "refine-logs/EXPERIMENT_PLAN.md"
+```
+
+This skill:
+- Detects the compute backend from `CLAUDE.md` (local, SSH, 启智, Vast.ai, Modal)
+- Detects available capacity (GPU count, free nodes)
+- Groups experiments into parallel waves based on dependencies
+- Dispatches using the backend's native parallel mechanism (qzcli batch, experiment-queue, Modal map, multi-GPU local)
+- Orchestrates wave transitions: waits for Wave N to complete before launching Wave N+1
+
+**If `PARALLEL_DEPLOY = false`**, fall back to serial deployment:
 
 ```
 /run-experiment [experiment commands]
 ```
 
 For each milestone:
-1. Deploy experiments in parallel (up to MAX_PARALLEL_RUNS)
+1. Deploy experiments sequentially via `/run-experiment`
 2. Use `/monitor-experiment` to track progress
 3. Collect results as experiments complete
 
@@ -203,8 +246,9 @@ As experiments complete:
 
 1. **Parse output files** (JSON/CSV/logs) for key metrics
 2. **Training quality check** — if W&B data is available (CLAUDE.md has `wandb: true` and `wandb_project`), invoke `/training-check` to detect NaN, loss divergence, plateaus, or overfitting. If W&B is not configured, skip silently.
-3. **Update `refine-logs/EXPERIMENT_TRACKER.md`** — fill in Status and Notes columns
-4. **Check success criteria** from EXPERIMENT_PLAN.md — did each experiment meet its bar?
+3. **Result plausibility check** — compare method results against baseline. If any method result is catastrophically below baseline (< 50% of baseline score), flag it as a likely bug rather than a weak result. Do not silently accept clearly broken results.
+4. **Update `refine-logs/EXPERIMENT_TRACKER.md`** — fill in Status and Notes columns
+5. **Check success criteria** from EXPERIMENT_PLAN.md — did each experiment meet its bar?
 4. **Write initial results summary:**
 
 ```markdown
@@ -264,6 +308,7 @@ After main experiments (M2) complete with positive results, invoke `/ablation-pl
 - Read the main results and method description
 - Generate a claim-driven ablation plan: which components to remove, what to compare, expected outcomes
 - Append ablation blocks to `refine-logs/EXPERIMENT_PLAN.md` and `refine-logs/EXPERIMENT_TRACKER.md`
+- Deploy ablation experiments via `/parallel-experiment-engine` (they are naturally independent and benefit from parallel execution)
 - If main results are negative or inconclusive, skip ablation planning and note in the summary
 
 If `/ablation-planner` is not available, skip silently — the existing EXPERIMENT_PLAN.md ablation blocks (if any) remain unchanged.
@@ -298,6 +343,8 @@ Ready for Workflow 2:
 - **CRITICAL — Evaluation must use dataset ground truth.** When writing evaluation scripts, ALWAYS compare model predictions against the dataset's actual ground truth labels/targets — NEVER use another model's output as ground truth. Double-check: (1) ground truth comes from the dataset split, not from a baseline/backbone model, (2) evaluation metrics are computed against the same ground truth for all methods, (3) if the task has official eval scripts, use those.
 - **Follow the plan.** Do not invent experiments not in EXPERIMENT_PLAN.md. If you think something is missing, note it but don't add it.
 - **Sanity first.** Never deploy a full suite without verifying the sanity stage passes.
+- **Baseline alignment before full deployment.** Never deploy a full experiment suite until baseline results are confirmed plausible. A method scoring 10% on a 60% baseline is a bug, not a weak method — fix the code first.
+- **Prefer parallel deployment.** When multiple independent experiments are ready, use `/parallel-experiment-engine` instead of serial `/run-experiment`. Different backends (启智, Modal, SSH) have different optimal parallel strategies — let the engine choose.
 - **Reuse existing code.** Scan the project before writing new scripts. Extend, don't duplicate.
 - **Save everything as JSON/CSV.** The auto-review-loop needs parseable results, not just terminal output.
 - **Update the tracker.** `EXPERIMENT_TRACKER.md` should reflect real status after each run completes.
@@ -310,7 +357,9 @@ Ready for Workflow 2:
 
 ```
 /idea-discovery "direction"          ← Workflow 1: find + refine + plan
-/experiment-bridge                   ← you are here (Workflow 1.5: implement + deploy)
+/experiment-bridge                   ← you are here (Workflow 1.5: implement + align + deploy)
+  ├── /baseline-alignment            ← Phase 3.5: verify results plausible before full deploy
+  └── /parallel-experiment-engine    ← Phase 4: parallel deploy across all backends
 /auto-review-loop "topic"            ← Workflow 2: review + iterate
 /paper-writing "NARRATIVE_REPORT.md" ← Workflow 3: write the paper
 

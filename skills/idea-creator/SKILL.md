@@ -15,10 +15,10 @@ Given a broad research direction from the user, systematically generate, validat
 
 ## Constants
 
-- **PILOT_MAX_HOURS = 2** — Skip any pilot estimated to take > 2 hours per GPU. Flag as "needs manual pilot".
-- **PILOT_TIMEOUT_HOURS = 3** — Hard timeout: kill pilots exceeding 3 hours. Collect partial results if available.
-- **MAX_PILOT_IDEAS = 3** — Pilot at most 3 ideas in parallel. Additional ideas are validated on paper only.
-- **MAX_TOTAL_GPU_HOURS = 8** — Total GPU budget for all pilots combined.
+- **PILOT_MAX_HOURS = 3** — Skip any pilot estimated to take > 3 hours per GPU. Flag as "needs manual pilot".
+- **PILOT_TIMEOUT_HOURS = 4** — Hard timeout: kill pilots exceeding 4 hours. Collect partial results if available.
+- **MAX_PILOT_IDEAS = 4** — Pilot at most 4 ideas in parallel. Additional ideas are validated on paper only.
+- **MAX_TOTAL_GPU_HOURS = 16** — Total GPU budget for all pilots combined.
 - **REVIEWER_BACKEND** — See `shared-references/reviewer-routing.md` for reviewer agent configuration.
 - **OUTPUT_DIR = `idea-stage/`** — All idea-stage outputs go here. Create the directory if it doesn't exist.
 

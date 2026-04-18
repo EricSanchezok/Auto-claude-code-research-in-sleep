@@ -13,7 +13,7 @@ Autonomously iterate: review → implement fixes → re-review, until the extern
 
 ## Constants
 
-- MAX_ROUNDS = 4
+- MAX_ROUNDS = 5
 - POSITIVE_THRESHOLD: score >= 6/10, or verdict contains "accept", "sufficient", "ready for submission"
 - REVIEW_DOC: `review-stage/AUTO_REVIEW.md` (cumulative log) *(fall back to `./AUTO_REVIEW.md` for legacy projects)*
 - **OUTPUT_DIR = `review-stage/`** — All review-stage outputs go here. Create the directory if it doesn't exist.

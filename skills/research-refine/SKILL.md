@@ -35,7 +35,7 @@ User input (PROBLEM + vague APPROACH)
 
 - **REVIEWER_MODEL** — Reviewer agent used via task() delegation.
 - **MAX_ROUNDS = 5** — Maximum review-revise rounds.
-- **SCORE_THRESHOLD = 9** — Minimum overall score to stop.
+- **SCORE_THRESHOLD = 7** — Minimum overall score to stop.
 - **OUTPUT_DIR = `refine-logs/`** — Directory for round files and final report.
 - **MAX_LOCAL_PAPERS = 15** — Maximum local papers/notes to scan for grounding.
 - **MAX_CORE_EXPERIMENTS = 3** — Default cap for core validation blocks inside this skill.

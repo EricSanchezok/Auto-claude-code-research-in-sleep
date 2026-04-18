@@ -17,7 +17,7 @@ Unlike `/auto-review-loop` (which iterates on **research** — running experimen
 
 ## Constants
 
-- **MAX_ROUNDS = 2** — Two rounds of review→fix→recompile. Empirically, Round 1 catches structural issues (4→6/10), Round 2 catches remaining presentation issues (6→7/10). Diminishing returns beyond 2 rounds for writing-only improvements.
+- **MAX_ROUNDS = 3** — Three rounds of review→fix→recompile. Round 1 catches structural issues, Round 2 catches remaining presentation issues, Round 3 fixes issues introduced by Round 2 (inconsistencies, citation gaps).
 - **REVIEWER_BIAS_GUARD = true** — When `true`, every review round uses a fresh `task()` call with no prior review context. Each `task()` call is naturally stateless, so bias guarding is the default behavior. Set to `false` only for deliberate debugging of legacy behavior. **Empirical evidence (April 2026):** running the same paper with context-carrying review prompts inflated scores from real 3/10 → fake 8/10 across 5 rounds; switching to fresh, stateless reviews recovered the true 3/10 assessment.
 - **REVIEW_LOG = `PAPER_IMPROVEMENT_LOG.md`** — Cumulative log of all rounds, stored in paper directory.
 - **HUMAN_CHECKPOINT = false** — When `true`, pause after each round's review and present score + weaknesses to the user. The user can approve fixes, provide custom modification instructions, skip specific fixes, or stop early. When `false` (default), runs fully autonomously.
