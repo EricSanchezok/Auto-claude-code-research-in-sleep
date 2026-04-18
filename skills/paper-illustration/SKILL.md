@@ -70,7 +70,7 @@ Generate publication-quality illustrations using a **multi-stage workflow** with
 - **MAX_ITERATIONS = 5** — Maximum refinement rounds
 - **TARGET_SCORE = 9** — Minimum acceptable score (1-10) — RAISED FOR QUALITY
 - **OUTPUT_DIR = `figures/ai_generated/`** — Output directory
-- **API_KEY_ENV = `GEMINI_API_KEY`** — Environment variable
+- **API_KEY_ENV = `SII_API_KEY`** — Environment variable (SII proxy key)
 
 ## CVPR/ICLR/NeurIPS Top-Tier Conference Style Guide
 
@@ -159,10 +159,9 @@ Generate publication-quality illustrations using a **multi-stage workflow** with
 
 ```bash
 # Check API key
-if [ -z "$GEMINI_API_KEY" ]; then
-    echo "ERROR: GEMINI_API_KEY not set"
-    echo "Get your key from: https://aistudio.google.com/app/apikey"
-    echo "Set it: export GEMINI_API_KEY='your-key'"
+if [ -z "$SII_API_KEY" ]; then
+    echo "ERROR: SII_API_KEY not set"
+    echo "Set it: export SII_API_KEY='your-sii-key'"
     exit 1
 fi
 
@@ -279,8 +278,8 @@ set -e
 OUTPUT_DIR="figures/ai_generated"
 mkdir -p "$OUTPUT_DIR"
 
-API_KEY="${GEMINI_API_KEY}"
-URL="https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent?key=$API_KEY"
+API_KEY="${SII_API_KEY}"
+URL="https://apicz.boyuerichdata.com/v1beta/models/gemini-3-pro-preview:generateContent"
 
 # The initial prompt from the executor
 INITIAL_PROMPT='[The executor fills in the detailed prompt here]'
@@ -312,10 +311,11 @@ with open("/tmp/gemini_layout_request.json", "w") as f:
 print("Layout request created")
 PYTHON
 
-# Call Gemini gemini-3-pro-preview for layout optimization (DIRECT connection, no proxy)
+# Call Gemini gemini-3-pro-preview for layout optimization (via SII proxy)
 RESPONSE=$(curl -s --max-time 90 \
   -X POST "$URL" \
   -H 'Content-Type: application/json' \
+  -H "x-goog-api-key: $API_KEY" \
   -d @/tmp/gemini_layout_request.json)
 
 # Extract layout description
@@ -341,8 +341,8 @@ echo "$LAYOUT_DESCRIPTION" > "$OUTPUT_DIR/layout_description.txt"
 #!/bin/bash
 # Step 3: Verify and enhance style compliance using Gemini gemini-3-pro
 
-API_KEY="${GEMINI_API_KEY}"
-URL="https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent?key=$API_KEY"
+API_KEY="${SII_API_KEY}"
+URL="https://apicz.boyuerichdata.com/v1beta/models/gemini-3-pro-preview:generateContent"
 
 # Read layout from previous step
 LAYOUT=$(cat figures/ai_generated/layout_description.txt)
@@ -375,10 +375,11 @@ with open("/tmp/gemini_style_request.json", "w") as f:
 print("Style request created")
 PYTHON
 
-# Call Gemini gemini-3-pro-preview for style verification (DIRECT connection, no proxy)
+# Call Gemini gemini-3-pro-preview for style verification (via SII proxy)
 RESPONSE=$(curl -s --max-time 90 \
   -X POST "$URL" \
   -H 'Content-Type: application/json' \
+  -H "x-goog-api-key: $API_KEY" \
   -d @/tmp/gemini_style_request.json)
 
 # Extract style-enhanced specification
@@ -411,8 +412,8 @@ set -e
 OUTPUT_DIR="figures/ai_generated"
 mkdir -p "$OUTPUT_DIR"
 
-API_KEY="${GEMINI_API_KEY}"
-URL="https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=$API_KEY"
+API_KEY="${SII_API_KEY}"
+URL="https://apicz.boyuerichdata.com/v1beta/models/gemini-3-pro-image-preview:generateContent"
 
 # Read the style-enhanced specification from previous step
 STYLE_SPEC=$(cat figures/ai_generated/style_spec.txt)
@@ -440,10 +441,11 @@ with open("/tmp/gemini_request.json", "w") as f:
 print("JSON payload created")
 PYTHON
 
-# Call Paperbanana API WITHOUT proxy (direct connection works better)
+# Call Paperbanana API (via SII proxy)
 RESPONSE=$(curl -s --max-time 180 \
   -X POST "$URL" \
   -H 'Content-Type: application/json' \
+  -H "x-goog-api-key: $API_KEY" \
   -d @/tmp/gemini_request.json)
 
 # Check for error
