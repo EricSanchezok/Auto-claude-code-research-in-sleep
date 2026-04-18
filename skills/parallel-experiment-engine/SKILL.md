@@ -307,9 +307,21 @@ For multi-wave plans, enforce wave ordering:
 After all waves complete:
 
 1. Parse all result files (JSON/CSV)
-2. Build the results comparison table
-3. Update `refine-logs/EXPERIMENT_TRACKER.md` with final status
-4. Write summary:
+2. **Training health check** — for each completed experiment, verify training was healthy:
+   - **Check training logs** (stdout, log files, or W&B API) for:
+     - NaN/Inf in loss or metrics → mark experiment `unhealthy:nan`
+     - Loss spike (>10x increase in a single step after convergence) → mark `unhealthy:spike`
+     - Gradient explosion (norm > 1e5) → mark `unhealthy:grad_explode`
+     - Loss never decreased (flat line from start to end) → mark `unhealthy:no_learning`
+   - **Auto-retry unhealthy experiments** (one attempt each):
+     - `nan` or `grad_explode` → reduce learning rate 10x, add gradient clipping (max_norm=1.0), re-run
+     - `spike` → add gradient clipping + learning rate warmup, re-run
+     - `no_learning` → check if optimizer is stepping, check if requires_grad is set, re-run with higher LR
+   - If retry still unhealthy → mark `failed_unhealthy` and log the diagnosis
+   - If W&B is configured, also invoke `/training-check` for detailed curve analysis
+3. Build the results comparison table
+4. Update `refine-logs/EXPERIMENT_TRACKER.md` with final status
+5. Write summary:
 
 ```markdown
 # Parallel Execution Summary

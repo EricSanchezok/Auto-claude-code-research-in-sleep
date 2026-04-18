@@ -135,7 +135,17 @@ When baseline results are far from expected, the implementation has a bug in the
 2. Check each item on the checklist above
 3. Fix the most likely issue
 4. Re-run baseline with the fix
-5. If still MISALIGNED after `MAX_DEBUG_ROUNDS` attempts, stop and report:
+5. **If the fix succeeds** (baseline becomes ALIGNED) → extract bug knowledge for future projects:
+   ```
+   memory_write(
+     title: "Bug: [short pattern, e.g., 'baseline PPL too high — wrong data split']",
+     content: "Pattern: [symptom]. Root cause: [why]. Fix: [what was changed]. Context: [dataset, framework, task].",
+     category: "knowledge",
+     recallMode: "contextual"
+   )
+   ```
+   This ensures the same bug pattern is prevented proactively in future implementations (via `/experiment-bridge` Phase 2 memory_search).
+6. If still MISALIGNED after `MAX_DEBUG_ROUNDS` attempts, stop and report:
 
 ```markdown
 # Baseline Alignment Failed
@@ -215,6 +225,8 @@ Same debug workflow as Phase 3.5, but focused on method-specific bugs:
    - Predictions not reaching the evaluation (discarded, overwritten)
 
 Fix → re-run → check → repeat up to `MAX_DEBUG_ROUNDS`.
+
+**If a method debug fix succeeds** (method becomes PLAUSIBLE) → extract bug knowledge same as Phase 3.5 (memory_write with pattern, root cause, fix, context).
 
 If still CATASTROPHIC after all debug rounds, stop and report with full diagnosis. **Do not deploy full experiments.**
 

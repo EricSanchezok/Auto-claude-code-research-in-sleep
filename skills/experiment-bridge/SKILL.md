@@ -86,7 +86,13 @@ For each milestone (in order), write the experiment scripts:
 
 1. **Check existing code** — scan the project (or cloned `base_repo/`) for existing experiment scripts, model code, data loaders. Reuse as much as possible.
 
-2. **Implement missing pieces:**
+2. **Learn from past bugs** — search memory for bug patterns relevant to this project's domain:
+   ```
+   memory_search(query: "bug pattern [framework] [dataset] [task]", top_k: 5)
+   ```
+   If relevant bug patterns are found, proactively avoid them during implementation. For example, if memory says "PyTorch DataLoader with num_workers > 0 on this dataset causes corrupted labels", set `num_workers=0` from the start. Log any patterns applied: `"Applied historical bug prevention: [pattern]"`.
+
+3. **Implement missing pieces:**
    - Training scripts with proper argparse (all hyperparameters configurable)
    - Evaluation scripts computing the specified metrics
    - Data loading / preprocessing if needed
@@ -245,11 +251,19 @@ Deploy now? Or review the code first?
 As experiments complete:
 
 1. **Parse output files** (JSON/CSV/logs) for key metrics
-2. **Training quality check** — if W&B data is available (CLAUDE.md has `wandb: true` and `wandb_project`), invoke `/training-check` to detect NaN, loss divergence, plateaus, or overfitting. If W&B is not configured, skip silently.
+2. **Training quality check** — if W&B data is available (CLAUDE.md has `wandb: true` and `wandb_project`), invoke `/training-check` to detect NaN, loss divergence, plateaus, or overfitting. If W&B is not configured, check training log files directly for NaN/Inf, loss spikes (>10x increase in a single step), and gradient explosion (norm > 1e5).
 3. **Result plausibility check** — compare method results against baseline. If any method result is catastrophically below baseline (< 50% of baseline score), flag it as a likely bug rather than a weak result. Do not silently accept clearly broken results.
-4. **Update `refine-logs/EXPERIMENT_TRACKER.md`** — fill in Status and Notes columns
-5. **Check success criteria** from EXPERIMENT_PLAN.md — did each experiment meet its bar?
-4. **Write initial results summary:**
+4. **Reproducibility self-check** — scan the experiment code for implicit dependencies that would prevent someone else from reproducing the results:
+   - Hard-coded absolute paths (`/home/user/...`, `/tmp/...`)
+   - Unpinned package versions (`pip install torch` without version)
+   - Environment variable dependencies without defaults (`os.environ['KEY']` without fallback)
+   - External service calls (API endpoints, remote databases)
+   - Random seed not set at all entry points
+   - If issues are found, fix them immediately and note in the results summary
+   - If Docker is available, optionally verify by running the main experiment in a fresh container (single seed, small data)
+5. **Update `refine-logs/EXPERIMENT_TRACKER.md`** — fill in Status and Notes columns
+6. **Check success criteria** from EXPERIMENT_PLAN.md — did each experiment meet its bar?
+7. **Write initial results summary:**
 
 ```markdown
 # Initial Experiment Results

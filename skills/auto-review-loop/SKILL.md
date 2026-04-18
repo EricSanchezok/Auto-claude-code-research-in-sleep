@@ -238,6 +238,19 @@ Then extract structured fields:
 
 **STOP CONDITION**: If score >= 6 AND verdict contains "ready" or "almost" → stop loop, document final state.
 
+**NEGATIVE RESULT DETECTION**: If round ≥ 2, compare current score against prior round scores from `REVIEW_STATE.json`. Check:
+
+1. **Score decay**: If score has decreased or stayed the same for 2 consecutive rounds (e.g., Round 1: 4, Round 2: 3, Round 3: 3) → the method may be fundamentally weak, not just buggy.
+2. **Low-score plateau**: If score has been ≤4 for 2+ consecutive rounds → the improvements being made are not moving the needle.
+3. **Degrading method performance**: If experiment results show method metric getting *worse* across rounds (not just review score) → fixes are introducing regressions rather than improvements.
+
+If any of these conditions are met:
+- **Do NOT proceed to Phase C.** Jump to Termination with status `negative_result`.
+- Write to findings.md: negative result analysis (what was tried, what didn't work, likely reasons).
+- Log: `"NEGATIVE_RESULT: Loop terminated early — score plateau/decay detected at Round N (score: X/10)"`.
+
+This prevents wasting GPU hours on iterative "improvements" to a method that is fundamentally not competitive. A negative result is a valid research outcome — it frees resources for the next idea.
+
 #### Phase B.5: Reviewer Memory Update (hard + nightmare only)
 
 **Skip entirely if `REVIEWER_DIFFICULTY = medium`.**
@@ -399,7 +412,23 @@ Prioritization rules:
 - Prefer reframing/analysis over new experiments when both address the concern
 - Always implement metric additions (cheap, high impact)
 
-#### Phase D: Wait for Results
+#### Phase C.5: Regression Check (before re-running experiments)
+
+**Skip this step if no code changes were made in Phase C** (e.g., only analysis or reframing).
+
+After implementing fixes but before deploying new experiments, verify the fixes did not introduce regressions:
+
+1. **Read `refine-logs/BASELINE_ALIGNMENT.json`** — if it exists, it contains the verified baseline result from `/baseline-alignment`.
+2. **Quick baseline re-run**: run the baseline experiment with the modified code, using the smallest configuration (single seed, small data if available). This should take 1-5 minutes.
+3. **Compare**: if the new baseline result deviates >5% from the value in `BASELINE_ALIGNMENT.json`, the code changes introduced a regression.
+4. **On regression detected**:
+   - Revert the last code change (`git checkout -- <files>` or manual revert)
+   - Try an alternative fix approach
+   - Re-check before proceeding
+   - If no alternative fix exists, skip this action item and move to the next
+5. **On no regression**: proceed to Phase D.
+
+This check catches the most common failure mode in review loops: fixing one bug while breaking something else. A 5-minute baseline re-run is far cheaper than a full experiment suite on broken code.
 
 If experiments were launched:
 - Monitor remote sessions for completion
@@ -461,6 +490,21 @@ This is the authoritative record. Do NOT truncate or paraphrase.]
 ```markdown
 - [Round N] [positive/negative/unexpected]: [one-sentence finding] (metric: X.XX → Y.YY)
 ```
+
+**Bug knowledge extraction** (when a bug was fixed in Phase C and confirmed in Phase D):
+
+If Phase C fixed a code bug AND Phase D confirmed the fix improved results, extract the bug pattern for future projects:
+
+```
+memory_write(
+  title: "Bug: [short pattern, e.g., 'eval uses model output as GT']",
+  content: "Pattern: [what went wrong]. Root cause: [why]. Fix: [what was changed]. Context: [framework, dataset, task]. Found in: [round N of auto-review-loop].",
+  category: "knowledge",
+  recallMode: "contextual"
+)
+```
+
+Only write when the fix is confirmed effective — do not write speculative or unverified fixes. This ensures the knowledge base contains reliable bug patterns, not guesses.
 
 Increment round counter → back to Phase A.
 

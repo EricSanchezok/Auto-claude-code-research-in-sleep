@@ -52,7 +52,10 @@ task(subagent_type="reviewer", category="most-capable"):
     [list experiments with method, dataset, metrics]
 
     Results:
-    [paste key numbers, comparison deltas, significance]
+    [paste key numbers, comparison deltas, p-values, effect sizes, significance annotations]
+
+    Statistical significance:
+    [if p-values are available: list which comparisons are significant (p<0.05), marginal, or not significant. If no p-values: state "no statistical testing performed — treat all deltas as inconclusive"]
 
     Baselines:
     [baseline numbers and sources — reproduced or from paper]
@@ -71,6 +74,7 @@ task(subagent_type="reviewer", category="most-capable"):
 
     Be honest. Do not inflate claims beyond what the data supports.
     A single positive result on one dataset does not support a general claim.
+    If statistical tests show p ≥ 0.05 for a comparison, that comparison does NOT support a claim of improvement — at best it supports "comparable" or "no significant difference". Set claim_supported to `partial` or `no` unless all key comparisons pass p < 0.05.
 ```
 
 ### Step 3: Parse and Normalize
