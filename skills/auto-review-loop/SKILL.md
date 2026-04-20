@@ -554,7 +554,7 @@ agenda_create(
       // Choose the right command for your platform:
       // Remote server:  "ssh <server> 'ls /path/to/results/final_metrics.json 2>/dev/null && echo DONE || echo PENDING'"
       // Local:         "ls /path/to/results/final_metrics.json 2>/dev/null && echo DONE || echo PENDING"
-      // 启智平台:       "qzcli qz_list_jobs --running-only 2>/dev/null | grep <job-name> || echo DONE"
+      // 启智平台 (Synergy native):  use kind="tool" watch: { kind: "tool", tool: "inspire_jobs", args: { status: "running" }, interval: "5m", trigger: "change" }
       command: "ssh <server> 'ls /path/to/results/final_metrics.json 2>/dev/null && echo DONE || echo PENDING'",
       interval: "5m",
       trigger: "match",
@@ -568,7 +568,7 @@ Alternative watch patterns (choose based on your platform):
 - **Screen/tmux session (remote)**: `ssh <server> 'screen -ls | grep <session_name>'` → trigger on match when screen exits
 - **Screen/tmux session (local)**: `screen -ls | grep <session_name>` → trigger on match when screen exits
 - **W&B run status**: `curl -s "https://api.wandb.ai/..." | jq .state` → trigger when state is `"finished"`
-- **启智平台 job**: `qzcli qz_list_jobs --running-only 2>/dev/null | grep <job-name> || echo DONE` → trigger on match "DONE"
+- **启智平台 job**: use agenda watch with `{ kind: "tool", tool: "inspire_jobs", args: { status: "running" }, trigger: "change" }` → fires when job list changes (completion/failure)
 - **Local file**: `{ kind: "file", glob: "results/**/*.json", event: "add" }` → trigger when result files appear
 
 After creating the agenda item, **log it in `review-stage/REVIEW_STATE.json`** under a new `agenda_item_id` field so you can cancel it if the loop is terminated early.

@@ -148,7 +148,7 @@ agenda_create(
       // Choose the right command for your platform:
       // Remote server:  "ssh <server> 'screen -ls 2>/dev/null; ls -lt <results_dir>/*.json 2>/dev/null | head -5'"
       // Local:         "screen -ls 2>/dev/null; ls -lt <results_dir>/*.json 2>/dev/null | head -5"
-      // 启智平台:       "qzcli qz_list_jobs --running-only 2>/dev/null; ls -lt <results_dir>/*.json 2>/dev/null | head -5"
+      // 启智平台 (Synergy native):  use kind="tool" watch: { kind: "tool", tool: "inspire_jobs", args: { status: "running" }, interval: "5m", trigger: "change" }
       command: "ssh <server> 'screen -ls 2>/dev/null; ls -lt <results_dir>/*.json 2>/dev/null | head -5'",
       interval: "5m",
       trigger: "change"          // Fire when screen sessions or result files change
@@ -160,7 +160,7 @@ agenda_create(
     Check experiment status on <server>.
 
     Steps:
-    1. Check running sessions (screen/tmux on remote, or qzcli jobs on 启智)
+    1. Check running sessions (screen/tmux on remote, or inspire_jobs on 启智)
     2. Check for new JSON result files in <results_dir>
     3. For each completed experiment, fetch and parse the result JSON
     4. Present results in a comparison table:
@@ -197,7 +197,7 @@ agenda_create(
       // Choose the right command for your platform:
       // Remote server:  "ssh <server> 'find <results_dir> -name \"*.json\" -newer <results_dir>/.last_check -print 2>/dev/null; touch <results_dir>/.last_check'"
       // Local:         "find <results_dir> -name '*.json' -newer <results_dir>/.last_check -print 2>/dev/null; touch <results_dir>/.last_check"
-      // 启智平台:       "qzcli qz_list_jobs --running-only 2>/dev/null; find <results_dir> -name '*.json' -newer <results_dir>/.last_check -print 2>/dev/null; touch <results_dir>/.last_check"
+      // 启智平台 (Synergy native):  use kind="tool" watch: { kind: "tool", tool: "inspire_jobs", args: { status: "running" }, interval: "5m", trigger: "change" }
       command: "ssh <server> 'find <results_dir> -name \"*.json\" -newer <results_dir>/.last_check -print 2>/dev/null; touch <results_dir>/.last_check'",
       interval: "5m",
       trigger: "change"          // Fire when new JSON files appear

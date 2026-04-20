@@ -184,9 +184,10 @@ command: "ssh <server> 'tail -1 /path/to/training.log'"
 command: "tail -1 /path/to/training.log"
 ```
 
-**启智平台 (qzcli)**:
+**启智平台 (Synergy native inspire tools)**:
 ```
-command: "qzcli qz_list_jobs --running-only 2>/dev/null | grep <job-name>"
+// Use agenda watch with tool polling instead of shell commands:
+triggers: [{ type: "watch", watch: { kind: "tool", tool: "inspire_jobs", args: { status: "running" }, interval: "5m", trigger: "change" } }]
 ```
 
 Full example with a remote server:
@@ -198,7 +199,7 @@ agenda_create(
     type: "watch",
     watch: {
       kind: "poll",
-      command: "ssh <server> 'tail -1 /path/to/training.log'",  // or local: "tail -1 /path/to/training.log", or qzcli: "qzcli qz_list_jobs --running-only 2>/dev/null | grep <job-name>"
+      command: "ssh <server> 'tail -1 /path/to/training.log'",  // or local: "tail -1 /path/to/training.log", or 启智: use kind="tool" watch with inspire_jobs
       interval: "5m",
       trigger: "change"        // Fire when the last line changes
     }
@@ -236,5 +237,5 @@ By default, `delivery: "auto"` sends results as an **assistant** message to your
 1. **Have the agenda task itself take action** — include instructions like "if NaN detected, kill the training process" directly in the agenda prompt. The kill command depends on your platform:
    - Remote server: `ssh <server> 'kill <pid>'`
    - Local: `kill <pid>`
-   - 启智平台: `qzcli qz_stop_job --job-id <job-id>`
+   - 启智平台: `inspire_stop(job_id="<job-id>")`
 2. **Use `session_send` with `role: "user"`** — include in the agenda prompt: "After checking, use `session_send(target: '<your-session-ID>', role: 'user', content: '...')` to wake up this session for follow-up action." This triggers the current session's agent to process the message and respond.

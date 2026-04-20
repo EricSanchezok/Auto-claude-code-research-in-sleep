@@ -214,10 +214,10 @@ Deploy experiments following the plan's milestone order.
 ```
 
 This skill:
-- Detects the compute backend from `CLAUDE.md` (local, SSH, 启智, Vast.ai, Modal)
+- Detects the compute backend from `CLAUDE.md` or Synergy config (local, SSH, 启智/inspire, Vast.ai, Modal)
 - Detects available capacity (GPU count, free nodes)
 - Groups experiments into parallel waves based on dependencies
-- Dispatches using the backend's native parallel mechanism (qzcli batch, experiment-queue, Modal map, multi-GPU local)
+- Dispatches using the backend's native parallel mechanism (inspire_submit, experiment-queue, Modal map, multi-GPU local)
 - Orchestrates wave transitions: waits for Wave N to complete before launching Wave N+1
 
 **If `PARALLEL_DEPLOY = false`**, fall back to serial deployment:
@@ -358,7 +358,7 @@ Ready for Workflow 2:
 - **Follow the plan.** Do not invent experiments not in EXPERIMENT_PLAN.md. If you think something is missing, note it but don't add it.
 - **Sanity first.** Never deploy a full suite without verifying the sanity stage passes.
 - **Baseline alignment before full deployment.** Never deploy a full experiment suite until baseline results are confirmed plausible. A method scoring 10% on a 60% baseline is a bug, not a weak method — fix the code first.
-- **Prefer parallel deployment.** When multiple independent experiments are ready, use `/parallel-experiment-engine` instead of serial `/run-experiment`. Different backends (启智, Modal, SSH) have different optimal parallel strategies — let the engine choose.
+- **Prefer parallel deployment.** When multiple independent experiments are ready, use `/parallel-experiment-engine` instead of serial `/run-experiment`. Different backends (启智/inspire, Modal, SSH) have different optimal parallel strategies — let the engine choose.
 - **Reuse existing code.** Scan the project before writing new scripts. Extend, don't duplicate.
 - **Save everything as JSON/CSV.** The auto-review-loop needs parseable results, not just terminal output.
 - **Update the tracker.** `EXPERIMENT_TRACKER.md` should reflect real status after each run completes.

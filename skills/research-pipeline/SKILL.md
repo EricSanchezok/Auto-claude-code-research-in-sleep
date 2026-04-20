@@ -139,7 +139,7 @@ Deploy the full-scale experiments using parallel scheduling:
 ```
 
 This automatically:
-- Detects the compute backend from `CLAUDE.md` (local, SSH, 启智, Vast.ai, Modal)
+- Detects the compute backend from `CLAUDE.md` or Synergy config (local, SSH, 启智/inspire, Vast.ai, Modal)
 - Detects available capacity (GPU count, free nodes)
 - Groups experiments into parallel waves based on dependencies
 - Dispatches using the backend's native parallel mechanism

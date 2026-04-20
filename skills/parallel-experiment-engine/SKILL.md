@@ -2,7 +2,7 @@
 name: parallel-experiment-engine
 description: "Unified parallel experiment scheduling across all compute backends. Automatically selects the optimal parallel strategy based on experiment scale and available backend (SSH remote, 启智 GPU/HPC, Vast.ai, Modal, local). Replaces serial /run-experiment calls when multiple independent experiments need deployment. Use when user says '并行跑实验', 'parallel experiments', 'run all experiments', 'batch deploy', or when /experiment-bridge would otherwise deploy sequentially."
 argument-hint: [experiment-list-or-plan-path]
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Task, Skill(run-experiment), Skill(experiment-queue), Skill(qzcli), Skill(serverless-modal), Skill(vast-gpu)
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Task, Skill(run-experiment), Skill(experiment-queue), Skill(serverless-modal), Skill(vast-gpu), inspire_status, inspire_submit, inspire_stop, inspire_jobs, inspire_job_detail
 ---
 
 # Parallel Experiment Engine: Multi-Backend Scheduling
@@ -16,8 +16,8 @@ Deploy experiments in parallel: **$ARGUMENTS**
 | Backend | Parallel Mechanism | Current Problem |
 |---------|-------------------|-----------------|
 | SSH remote | `/experiment-queue` scheduler | Not auto-invoked by pipeline |
-| 启智 GPU | `qzcli batch` (Cartesian submit) | Not integrated into experiment-bridge |
-| 启智 HPC/CPU | `qzcli hpc` + Slurm array | Not integrated into experiment-bridge |
+| 启智 GPU | `inspire_submit` (loop per experiment) | Not integrated into experiment-bridge |
+| 启智 HPC/CPU | `inspire_submit_hpc` | Not integrated into experiment-bridge |
 | Vast.ai | Rent multiple instances | Only 1 instance at a time |
 | Modal | `@modal.function .map()` | Only single launcher per call |
 | Local | Multi-process, CUDA_VISIBLE_DEVICES | Only 1 GPU at a time |
@@ -30,7 +30,7 @@ This skill provides a unified scheduling layer that detects the backend, estimat
 - **AUTO_DETECT_BACKEND = true** — When `true`, read `CLAUDE.md` to determine backend. When `false`, use the `backend` specified in arguments.
 - **ESTIMATE_ONLY = false** — When `true`, generate the deployment plan without executing. Useful for preview before committing GPU hours.
 
-> 💡 Override: `/parallel-experiment-engine "plan" — serial_threshold: 10, backend: qzcli, estimate_only: true`
+> 💡 Override: `/parallel-experiment-engine "plan" — serial_threshold: 10, backend: inspire, estimate_only: true`
 
 ## Workflow
 
@@ -85,14 +85,14 @@ If `AUTO_DETECT_BACKEND = true`, read `CLAUDE.md`:
 | `gpu: remote` + SSH alias | ssh | `ssh <server> nvidia-smi` — count free GPUs |
 | `gpu: vast` | vast | Read `vast-instances.json` or rent new instances |
 | `gpu: modal` | modal | Modal auto-scales — capacity = number of experiments |
-| `gpu: qzcli` or `启智` mentioned | qzcli | `qzcli avail` — count free nodes per compute group |
-| HPC/CPU section | qzcli-hpc | `qzcli avail` — count HPC nodes |
+| `sii.enable=true` or `启智` mentioned | inspire | `inspire_status` — check free GPUs per compute group |
+| HPC/CPU section | inspire-hpc | `inspire_status` — check HPC nodes |
 
 Write capacity to the manifest:
 
 ```json
 {
-  "backend": "qzcli",
+  "backend": "inspire",
   "capacity": {
     "compute_group": "lcg-xxx",
     "total_nodes": 8,
@@ -161,55 +161,34 @@ Write the plan to `refine-logs/PARALLEL_PLAN.md`:
 
 Execute the plan using the appropriate backend mechanism:
 
-#### Backend: `qzcli` (启智 GPU)
+#### Backend: `inspire` (启智 GPU)
 
-Use `qzcli batch` or loop `qzcli create` for each wave:
+Loop `inspire_submit` for each experiment in the wave:
 
-**Wave dispatch:**
-```bash
-# Generate batch config for this wave
-cat > /tmp/wave_N_batch.json << 'EOF'
-{
-  "defaults": {
-    "workspace": "ws-xxx",
-    "compute_group": "lcg-xxx",
-    "spec": "spec-xxx",
-    "image": "docker.sii.shaipower.online/inspire-studio/dhyu-wan-torch29:0.4",
-    "instances": 1
-  },
-  "matrix": {
-    "experiment_id": ["R001", "R003", "R005"],
-    "command": ["python train.py --model baseline --seed 42", "python train.py --model baseline --seed 42 --dataset ptb", "..."]
-  },
-  "name_template": "wave1-{experiment_id}",
-  "command_template": "{command}"
-}
-EOF
-
-# Submit
-qzcli batch /tmp/wave_N_batch.json --delay 3
-
-# Track submitted jobs
-qzcli watch -i 30
+```
+for each experiment in wave:
+  inspire_submit(
+    name: "wave1-{experiment_id}",
+    command: "{experiment_command}",
+    workspace: "{workspace}",
+    compute_group: "{compute_group}",
+    image: "{image}",
+  )
 ```
 
-> Note: For `qzcli batch`, if each experiment has a unique command (not a simple matrix), fall back to a shell loop of `qzcli create` calls instead.
+Track submitted jobs via `inspire_jobs(status="running")`.
 
-#### Backend: `qzcli-hpc` (启智 HPC/CPU)
+#### Backend: `inspire-hpc` (启智 HPC/CPU)
 
-For CPU-bound experiments (data preprocessing, evaluation, ablation analysis):
+For CPU-bound experiments:
 
-```bash
-qzcli hpc \
-  --name "eval-wave-N" \
-  --workspace ws-xxx \
-  --compute-group lcg-xxx \
-  --predef-quota-id xxx \
-  --cpu 55 --mem-gi 300 --instances [N] \
-  --entrypoint "cd /path && bash run_wave_N.sh"
 ```
-
-Where `run_wave_N.sh` runs all wave-N experiments using Slurm array or GNU parallel inside the HPC job.
+inspire_submit_hpc(
+  name: "eval-wave-N",
+  entrypoint: "cd /path && bash run_wave_N.sh",
+  workspace: "高性能计算",
+)
+```
 
 #### Backend: `ssh` (Remote server)
 
@@ -287,7 +266,7 @@ For multi-wave plans, enforce wave ordering:
 
 1. Deploy Wave 1 experiments
 2. Poll for completion (backend-specific):
-   - `qzcli`: `qzcli ls -r` or `qzcli watch`
+   - `inspire`: `inspire_jobs(status="running")` or agenda watch with `kind="tool"`
    - `ssh`: read `queue_state.json` from `/experiment-queue`
    - `modal`: `modal app list`
    - `vast`: `ssh` + `screen -ls`
@@ -372,7 +351,7 @@ The monitor skill can check parallel execution progress by reading `refine-logs/
 
 - **Always prefer parallel over serial when jobs are independent.** If two experiments don't depend on each other, they should run concurrently.
 - **Respect dependency ordering.** Never launch Wave N+1 before all Wave N dependencies are satisfied.
-- **Backend-appropriate dispatch.** Don't try to use `screen` sessions on 启智 or `qzcli batch` on a remote SSH server. Each backend has its own natural mechanism — use it.
+- **Backend-appropriate dispatch.** Don't try to use `screen` sessions on 启智 or `inspire_submit` on a remote SSH server. Each backend has its own natural mechanism — use it.
 - **Capacity-aware scheduling.** Don't launch 8 parallel jobs on a 4-GPU server. Detect capacity first, then schedule.
 - **MUST-RUN experiments are never skipped.** If a MUST-RUN fails, pause the pipeline and report. NICE-TO-HAVE failures are logged but don't block.
 - **Cost awareness.** Before dispatching, show estimated total cost (especially for Vast.ai and Modal). Warn if approaching budget limits.

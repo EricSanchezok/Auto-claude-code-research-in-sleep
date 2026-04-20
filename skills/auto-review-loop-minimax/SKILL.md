@@ -288,14 +288,16 @@ triggers:
       match: "DONE"
 ```
 
-**启智平台 (qzcli poll):**
+**启智平台 (Synergy native inspire tools):**
 ```
 triggers:
   - type: watch
     watch:
-      kind: poll
-      command: "qzcli qz_list_jobs --running-only 2>/dev/null | grep <job-name> || echo DONE"
+      kind: tool
+      tool: inspire_jobs
+      args: { status: "running" }
       interval: "5m"
+      trigger: change
       trigger: match
       match: "DONE"
 ```
